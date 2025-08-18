@@ -1,0 +1,90 @@
+:root {
+    --bg: #0b0b0b;
+    --text: #f0f0f0;
+    --accent: #f8f5f0;
+    --muted: rgba(255,255,255,0.6);
+    --box-bg: rgba(255,255,255,0.05);
+}
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: monospace;
+    margin: 0;
+    padding: 2rem 1.5rem;
+    max-width: 800px;
+    margin-inline: auto;
+    font-size: 16px;
+    line-height: 1.6;
+}
+header {
+    margin-bottom: 2rem;
+}
+.nick {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--accent);
+    letter-spacing: 1px;
+}
+h2 {
+    font-size: 1.2rem;
+    margin-bottom: 0.6rem;
+    margin-top: 1.5rem;
+}
+h2::before {
+    content: "// ";
+    color: var(--accent);
+}
+a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: bold;
+}
+a:hover {
+    text-decoration: underline;
+}
+section {
+    margin-bottom: 2rem;
+}
+.contact-boxes {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.contact-box {
+    background: var(--box-bg);
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    display: inline-block;
+}
+.contact-box a {
+    display: block;
+}
+.bio-list p {
+    margin: 0.2rem 0;
+    color: var(--muted);
+}
+.status {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 1rem;
+}
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: red;
+    box-shadow: 0 0 4px red;
+}
+.dot.online {
+    background: var(--accent);
+    box-shadow: 0 0 4px var(--accent);
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+td {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
