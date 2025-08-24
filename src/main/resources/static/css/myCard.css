@@ -4,6 +4,7 @@
     --accent: #f8f5f0; /* чуть ванильный белый */
     --muted: rgba(255, 255, 255, 0.6);
     --box-bg: rgba(255, 255, 255, 0.05);
+    --chip-bg: rgba(255,255,255,0.08);
 }
 
 body {
@@ -11,11 +12,11 @@ body {
     color: var(--text);
     font-family: monospace;
     margin: 0;
-    padding: 2rem 5rem;
-    max-width: 800px;
+    padding: 2rem;
+    max-width: 900px;
     margin-inline: auto;
     font-size: 16px;
-    line-height: 1.1;
+    line-height: 1.4;
 }
 
 h1.nick {
@@ -23,21 +24,17 @@ h1.nick {
     font-size: 2rem;
     font-weight: bold;
     margin: 0;
+    text-align: right;
 }
 
-h1 {
-    font-size: 1.1rem;
+h2 {
+    font-size: 1.2rem;
     font-weight: bold;
-    margin-bottom: 0.8rem;
-    margin-top: 1.8rem;
+    margin: 2rem 0 1rem 0;
 }
 
 .p-marks {
     color: var(--muted);
-}
-
-p {
-    text-decoration: none;
 }
 
 a {
@@ -52,24 +49,55 @@ a:hover {
 
 ul {
     list-style: none;
-    padding: 0 12px;
+    padding: 0;
     margin: 0;
 }
 
 ul li {
-    margin: 0.2rem 0;
+    margin: 0.3rem 0;
+}
+
+/* Контакты в линию */
+.social ul {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .contact-box {
     background: var(--box-bg);
     border-radius: 6px;
-    padding:0.5rem 0.9rem;
+    padding: 0.5rem 0.9rem;
     display: inline-flex;
-    margin: 0.2rem 0;
-    position: relative;
     align-items: center;
-    justify-content: center;
-    gap: 5px;
+    gap: 6px;
+    transition: background 0.2s;
+}
+.contact-box:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.contact-box img {
+    width: 18px;
+    height: 18px;
+}
+
+/* Skills как чипы */
+.skills-list {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.skill-chip {
+    background: var(--chip-bg);
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+.skill-chip:hover {
+    background: rgba(255, 255, 255, 0.15);
 }
 
 table {
@@ -79,19 +107,27 @@ table {
 }
 
 td {
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-header.avatar img {
-    width: 60px;
-    height: 60px;
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nick-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.nick-avatar img {
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
-    margin-left: 0.8rem;
-    vertical-align: middle;
-}
-
-.contact-box img {
-    width: 20px;
-    height: 20px;
+    border: 2px solid rgba(128, 128, 128, 0.3);
+    object-fit: cover;
 }

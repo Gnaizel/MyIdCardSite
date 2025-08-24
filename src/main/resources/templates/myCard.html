@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../static/css/myCard.css">
+    <link rel="stylesheet" href="/css/myCard.css">
+    <script src="/js/time.js"></script>
     <title>Gnaizel</title>
 </head>
 <body>
 <div class="title-block">
-    <header class="nick avatar">
-        <a href="/">
-            <h1 class="nick">Gnaizel</h1>
-            <img src="/image/sdfgsdfljh.img" alt="avatar">
-        </a>
+    <header>
+        <div class="nick-avatar">
+            <h1 class="nick"><span class="p-marks">@</span>Gnaizel</h1>
+            <img src="/image/photo_2025-08-24_16-06-35.jpg" alt="avatar">
+        </div>
     </header>
 </div>
 
@@ -33,20 +34,20 @@
         <ul>
             <li>
                 <div class="contact-box">
-                    <img src="../static/image/github-svgrepo-com.svg" alt="icon">
-                    <a href="#">github</a>
+                    <img src="/image/github-svgrepo-com.svg" alt="icon">
+                    <a href="https://github.com/Gnaizel">github</a>
                 </div>
             </li>
             <li>
                 <div class="contact-box">
-                    <img src="../static/image/steam-svgrepo-com.svg" alt="icon">
-                    <a href="#">steam</a>
+                    <img src="/image/steam-svgrepo-com.svg" alt="icon">
+                    <a href="https://steamcommunity.com/id/Gnaisel/">steam</a>
                 </div>
             </li>
             <li>
                 <div class="contact-box">
-                    <img src="../static/image/telegram-svgrepo-com.svg" alt="icon">
-                    <a href="#">telegram</a>
+                    <img src="/image/telegram-svgrepo-com.svg" alt="icon">
+                    <a href="https://telegram.me/gnaizel">telegram</a>
                 </div>
             </li>
         </ul>
@@ -54,13 +55,13 @@
 
     <section class="tech-stack">
         <h2><span class="p-marks">//</span> Skills</h2>
-        <ul>
-            <li><span class="p-marks">-</span> java</li>
-            <li><span class="p-marks">-</span> spring boot</li>
-            <li><span class="p-marks">-</span> docker</li>
-            <li><span class="p-marks">-</span> postgresql</li>
-            <li><span class="p-marks">-</span> git</li>
-        </ul>
+        <div class="skills-list">
+            <span class="skill-chip">Java</span>
+            <span class="skill-chip">Spring Boot</span>
+            <span class="skill-chip">Docker</span>
+            <span class="skill-chip">PostgreSQL</span>
+            <span class="skill-chip">Git</span>
+        </div>
     </section>
 
     <section class="device">
@@ -80,15 +81,5 @@
     </section>
 
 </div>
-
-<script>
-    function updateTime() {
-        const now = new Date();
-        document.getElementById('time').textContent =
-            now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
-</script>
 </body>
 </html>
