@@ -174,11 +174,11 @@ header {
 }
 
 .device td:first-child {
-    font-weight: bold;
-    padding-right: 12px;
-    white-space: nowrap;
+    font-weight: bold; /* чтобы названия устройств выделялись */
+    padding-right: 12px; /* добавляем отступ справа */
+    white-space: nowrap; /* чтобы laptop/pc/server не переносились */
 }
 
 .device td:last-child {
-    padding-left: 8px;
+    padding-left: 8px; /* небольшой отступ слева для воздуха */
 }
