@@ -177,6 +177,7 @@ header {
     font-weight: bold;
     padding-right: 12px;
     white-space: nowrap;
+}
 
 .device td:last-child {
     padding-left: 8px;
