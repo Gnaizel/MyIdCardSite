@@ -5,5 +5,5 @@ services:
       dockerfile: Dockerfile
     container_name: my-site
     ports:
-      - "443:443"
+      - "80:80"
     restart: unless-stopped

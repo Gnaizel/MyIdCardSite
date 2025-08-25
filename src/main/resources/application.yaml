@@ -1,12 +1,12 @@
 server:
-  port: 443
-  ssl:
-    key-alias: gnaizel
-    key-store-type: PKCS12
-    key-password: pass
-    key-store: /etc/letsencrypt/live/gnaizel.online/keystore.p12
-  http2:
-    enabled: true
+  port: 80
+#  ssl:
+#    key-alias: gnaizel
+#    key-store-type: PKCS12
+#    key-password: pass
+#    key-store: /etc/letsencrypt/live/gnaizel.online/keystore.p12
+#  http2:
+#    enabled: true
 logging:
   level:
     root: info
