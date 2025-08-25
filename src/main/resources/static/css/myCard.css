@@ -172,13 +172,3 @@ header {
         font-size: 12px;
     }
 }
-
-.device td:first-child {
-    font-weight: bold;
-    padding-right: 12px;
-    white-space: nowrap;
-}
-
-.device td:last-child {
-    padding-left: 8px;
-}
