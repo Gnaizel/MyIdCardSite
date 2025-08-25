@@ -13,7 +13,7 @@ body {
     font-family: monospace;
     margin: 0;
     padding: 2rem;
-    max-width: 900px;
+    max-width: 780px;
     margin-inline: auto;
     font-size: 16px;
     line-height: 1.4;
@@ -24,6 +24,7 @@ h1.nick {
     font-size: 2rem;
     font-weight: bold;
     margin: 0;
+    align-self: flex-end;
     text-align: right;
 }
 
@@ -119,9 +120,10 @@ header {
 
 .nick-avatar {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
     width: 100%;
+    align-items: stretch;
+    justify-content: space-between;
+    min-height: 140px;
 }
 
 .nick-avatar img {
@@ -130,4 +132,5 @@ header {
     border-radius: 50%;
     border: 2px solid rgba(128, 128, 128, 0.3);
     object-fit: cover;
+    align-self: flex-start;
 }

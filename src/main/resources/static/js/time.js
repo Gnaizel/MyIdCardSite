@@ -11,8 +11,17 @@ function updateTime() {
         });
 }
 
-// Вызываем функцию при загрузке страницы
-updateTime();
+function updateAge() {
+    fetch("/old")
+        .then(res => res.text())
+        .then(age => {
+            document.getElementById("old").textContent = age;
+        })
+        .catch(err => console.error("Ошибка при запросе возраста:", err));
+}
 
-// Обновляем время периодически
+updateTime();
+updateAge();
+
+setInterval(updateAge, 1000)
 setInterval(updateTime, 1000);

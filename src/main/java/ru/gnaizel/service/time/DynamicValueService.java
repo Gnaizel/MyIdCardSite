@@ -1,5 +1,7 @@
 package ru.gnaizel.service.time;
 
-public interface TimeService {
+public interface DynamicValueService {
     String getCurrentTime();
+
+    String getAlive();
 }
