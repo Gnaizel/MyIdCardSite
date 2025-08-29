@@ -194,6 +194,47 @@ footer {
     transition: transform .2s, background .2s;
 }
 
+
+.track-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-width: 400px;
+    width: 100%;
+}
+
+.track {
+    display: flex;
+    align-items: center;
+    background: var(--box-bg);
+    border-radius: 10px;
+    padding: 10px;
+    gap: 10px;
+}
+
+.track img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.23);
+}
+
+.track-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.track-name {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.track-artist {
+    font-size: 14px;
+    color: #aaa;
+}
+
 /*  для мабилки */
 
 @media (max-width: 768px) {

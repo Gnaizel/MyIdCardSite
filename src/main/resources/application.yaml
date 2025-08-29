@@ -7,6 +7,8 @@ server:
 #    key-store: /etc/letsencrypt/live/gnaizel.online/keystore.p12
 #  http2:
 #    enabled: true
+last.fm:
+  api-token: "f8af34f52c1a0b81338eec49308b2e44"
 logging:
   level:
     root: info
