@@ -10,10 +10,14 @@
 <body>
 <div class="title-block">
     <header>
-        <div class="nick-avatar">
-            <h1 class="nick"><span class="p-marks">@</span>Gnaizel</h1>
+        <div class="profile">
             <img src="/image/photo_2025-08-24_16-06-35.jpg" alt="avatar">
+            <div>
+                <h1 class="nick"><span class="p-marks">@</span>Gnaizel</h1>
+                <h2 class="tagline">Backend Developer</h2>
+            </div>
         </div>
+<!--        <div class="theme-toggle">☀️/🌙</div>-->
     </header>
 </div>
 
@@ -21,17 +25,17 @@
 
     <section class="bio">
         <h2><span class="p-marks">//</span> Bio</h2>
-        <ul>
+        <ul class="list">
             <li><span class="p-marks">-</span> location: Saratov/Russia</li>
             <li><span class="p-marks">-</span> local time: <span id="time"></span></li>
             <li><span class="p-marks">-</span> timezone: UTC+4</li>
-            <li><span class="p-marks">-</span> age: <snap id="old"></snap></li>
+            <li><span class="p-marks">-</span> age: <span id="old"></span></li>
         </ul>
     </section>
 
     <section class="social">
         <h2><span class="p-marks">//</span> Social</h2>
-        <ul>
+        <ul class="list">
             <li>
                 <div class="contact-box">
                     <img src="/image/github-svgrepo-com.svg" alt="icon">
@@ -66,12 +70,36 @@
 
     <section class="device">
         <h2><span class="p-marks">//</span> Device</h2>
-        <table>
-            <tr><td>laptop</td><td>intel(R) UHD Graphics, 8G RAM, i5-12450H, 500G DISK</td></tr>
-            <tr><td>pc</td><td>GeForce GTX 1660 SUPER, 16G RAM, i7-11700K, 3TB DISK</td></tr>
-            <tr><td>server</td><td>16G RAM, Intel i5-9400F, 1.8TB DISK</td></tr>
-        </table>
+        <div class="device-card">
+            <div class="device-header">💻 laptop</div>
+            <ul class="device-specs">
+                <li>intel(R) UHD Graphics</li>
+                <li>8G RAM</li>
+                <li>i5-12450H</li>
+                <li>500G DIS</li>
+            </ul>
+        </div>
+        <div class="device-card">
+            <div class="device-header">🖥️ pc</div>
+            <ul class="device-specs">
+                <li>GeForce GTX 1660 SUPER</li>
+                <li>16G RAM</li>
+                <li>i7-11700K</li>
+                <li>3TB DISK</li>
+            </ul>
+        </div>
+        <div class="device-card">
+            <div class="device-header">🗄️ server</div>
+            <ul class="device-spece">
+                <li>16G RAM</li>
+                <li>Intel i5-9400F</li>
+                <li>1.8TB DISK</li>
+            </ul>
+        </div>
     </section>
+    <footer>
+        <div id="quote">// Ага</div>
+    </footer>
 
 <!--    <section class="game">-->
 <!--        <h2><span class="p-marks">//</span> Game</h2>-->

@@ -11,17 +11,30 @@ function updateTime() {
         });
 }
 
+updateTime();
+setInterval(updateTime, 1000);
+
 function updateAge() {
-    fetch("/old")
+
+    fetch('/old')
         .then(res => res.text())
-        .then(age => {
-            document.getElementById("old").textContent = age;
+        .then(data => {
+            document.getElementById('old').textContent = data;
         })
         .catch(err => console.error("Ошибка при запросе возраста:", err));
 }
 
-updateTime();
 updateAge();
+setInterval(updateAge, 1000);
 
-setInterval(updateAge, 1000)
-setInterval(updateTime, 1000);
+document.addEventListener("DOMContentLoaded", () => {
+    const quotes = [
+        "// keep it simple",
+        "// code. sleep. repeat.",
+        "// less is more",
+        "// backend > frontend",
+        "// stay curious"
+    ];
+    document.getElementById("quote").innerText =
+        quotes[Math.floor(Math.random() * quotes.length)];
+});
