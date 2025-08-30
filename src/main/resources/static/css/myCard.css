@@ -25,6 +25,10 @@ h2 {
     margin: 2rem 0 1rem 0;
 }
 
+h3 {
+    font-size: .9rem;
+}
+
 .p-marks {
     color: var(--muted);
 }
@@ -194,16 +198,41 @@ footer {
     transition: transform .2s, background .2s;
 }
 
+.title {
+    width: 100%;
+    display: flex;
+    align-items: start;
+    line-height: 0px;
+    flex-direction: column;
+}
 
 .track-list {
     display: flex;
+    flex-direction: row;
+    gap: 10px;
+    max-width: 680px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.track-column {
     flex-direction: column;
-    gap: 15px;
-    max-width: 400px;
+    display: flex;
+    max-width: 335px;
     width: 100%;
 }
 
+.track:not(:first-child) {
+    margin-top: 9px;
+}
+
+h3.tagline {
+    padding-left: 1.4rem;
+}
+
 .track {
+    line-height: 1.4rem;
+    margin-top: 10px;
     display: flex;
     align-items: center;
     background: var(--box-bg);
@@ -216,8 +245,8 @@ footer {
     width: 60px;
     height: 60px;
     object-fit: cover;
-    border-radius: 5px;
-    border: 1px solid rgba(255, 255, 255, 0.23);
+    /*border-radius: 5px;*/
+    /*border: 1px solid rgba(255, 255, 255, 0.23);*/
 }
 
 .track-info {
