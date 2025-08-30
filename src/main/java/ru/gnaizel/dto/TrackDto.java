@@ -11,4 +11,5 @@ public class TrackDto {
     private String name;
     private String artist;
     private String imageUrl;
+    private boolean attr;
 }

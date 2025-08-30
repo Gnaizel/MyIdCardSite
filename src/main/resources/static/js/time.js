@@ -61,16 +61,10 @@ async function fetchTracks() {
 }
 
 function displayTracks(tracks) {
-    const leftColumn = document.getElementById('track-list-left');
-    const rightColumn = document.getElementById('track-list-right');
-    
-    leftColumn.innerHTML = '';
-    rightColumn.innerHTML = '';
+    const trackList = document.getElementById('track-list');
+    trackList.innerHTML = '';
 
-    const leftTracks = tracks.slice(0, 3); // Первые 3 трека
-    const rightTracks = tracks.slice(3, 6); // Следующие 3 трека
-
-    const createTrackElement = (track) => {
+    tracks.forEach(track => {
         const trackEl = document.createElement('div');
         trackEl.className = 'track';
 
@@ -86,17 +80,24 @@ function displayTracks(tracks) {
             </div>
         `;
 
-        return trackEl;
-    };
+        if (track.attr) {
+            trackEl.classList.add('playing');
+        }
 
-    leftTracks.forEach(track => {
-        leftColumn.appendChild(createTrackElement(track));
-    });
-
-    rightTracks.forEach(track => {
-        rightColumn.appendChild(createTrackElement(track));
+        trackList.appendChild(trackEl);
     });
 }
 
 fetchTracks();
 setInterval(fetchTracks, 10000);
+
+document.addEventListener("DOMContentLoaded", () => {
+    const trackList = document.querySelector('.track-list');
+
+    trackList.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) {
+            trackList.scrollLeft += e.deltaY;
+            e.preventDefault();
+        }
+    });
+});
