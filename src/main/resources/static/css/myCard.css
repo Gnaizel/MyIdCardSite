@@ -212,7 +212,7 @@ footer {
 
 .track-list {
     display: flex;
-    flex-direction: row;
+    flex-wrap: wrap;
     gap: 10px;
     width: 100%;
     margin: 0 auto;
@@ -221,6 +221,8 @@ footer {
 }
 
 .track-column {
+    flex: 1 1 0;
+    min-width: 0;
     flex-direction: column;
     display: flex;
     max-width: 335px;
@@ -236,6 +238,9 @@ h3.tagline {
 }
 
 .track {
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
     line-height: 1.4rem;
     margin-top: 10px;
     display: flex;
