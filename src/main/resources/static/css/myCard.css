@@ -56,7 +56,7 @@ ul li {
 /* Контакты в линию */
 .social ul {
     display: flex;
-    gap: 12px;
+    gap: 5px;
     flex-wrap: wrap;
 }
 
@@ -271,6 +271,45 @@ h3.tagline {
 /*  для мабилки */
 
 @media (max-width: 768px) {
+    .device-card {
+        padding: 1rem;
+        background: var(--box-bg);
+        border-radius: 10px;
+        display: flex;
+        width: 100%;
+        gap: .6rem;
+        flex-direction: column;
+        transition: transform .2s, background .2s;
+    }
+
+    .track-list {
+        flex-direction: column;
+        gap: 0; /* чтобы между колонками не было лишнего отступа */
+    }
+
+    .track-column {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .track {
+        width: 100%;
+        margin-top: 8px;
+    }
+
+    .track img {
+        width: 50px;
+        height: 50px;
+    }
+
+    .track-name {
+        font-size: 14px;
+    }
+
+    .track-artist {
+        font-size: 12px;
+    }
+
     body {
         font-size: 14px;
     }
