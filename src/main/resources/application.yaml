@@ -1,12 +1,12 @@
 server:
-  port: 80
-#  ssl:
-#    key-alias: gnaizel
-#    key-store-type: PKCS12
-#    key-password: pass
-#    key-store: /etc/letsencrypt/live/gnaizel.online/keystore.p12
-#  http2:
-#    enabled: true
+  port: 443
+  ssl:
+    key-alias: tomcat
+    key-store-type: PKCS12
+    key-store: classpath:keystore.p12
+    key-store-password:
+  http2:
+    enabled: true
 last.fm:
   api-token: "f8af34f52c1a0b81338eec49308b2e44"
 logging:
@@ -17,8 +17,8 @@ spring:
     driver-class-name: org.postgresql.Driver
     username: postgres
     password: postgres
-#    url:  jdbc:postgresql://localhost:2346/visitor-db
-    url:  jdbc:postgresql://visitor-db:5432/visitor-db
+    url:  jdbc:postgresql://localhost:2346/visitor-db
+#    url:  jdbc:postgresq l://visitor-db:5432/visitor-db
   jpa:
     hibernate:
       ddl-auto: update
