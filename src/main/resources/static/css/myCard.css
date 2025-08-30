@@ -214,9 +214,10 @@ footer {
     display: flex;
     flex-direction: row;
     gap: 10px;
-    max-width: 680px;
     width: 100%;
     margin: 0 auto;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .track-column {
@@ -284,7 +285,7 @@ h3.tagline {
 
     .track-list {
         flex-direction: column;
-        gap: 0; /* чтобы между колонками не было лишнего отступа */
+        gap: 0;
     }
 
     .track-column {
