@@ -24,12 +24,23 @@ function updateAge() {
         .catch(err => console.error("Ошибка при запросе возраста:", err));
 }
 
+function updateVisitCounter() {
+    fetch("/visitor")
+        .then(res => res.text())
+        .then(data => {
+          document.getElementById('number-of-visits').textContent = data;
+        })
+        .catch(err => console.error("Ошибка вывода числа посещений"));
+}
+
+updateVisitCounter();
+
 updateAge();
 setInterval(updateAge, 1000);
 
 document.addEventListener("DOMContentLoaded", () => {
     const quotes = [
-        "// Don't forget",
+        "// Don't forget about me.",
         "// code. sleep. repeat.",
         "// Seven minutes. That's all it takes to begin anew. ",
         "// Seven minutes. That's all it took.",
