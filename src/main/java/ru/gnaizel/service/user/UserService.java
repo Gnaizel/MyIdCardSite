@@ -1,6 +1,6 @@
 package ru.gnaizel.service.user;
 
 public interface UserService {
-    void addVisit();
-    long getCountOfVisit();
+    void addVisit(String ip);
+    Long getCountOfVisit();
 }

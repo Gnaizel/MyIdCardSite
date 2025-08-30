@@ -13,5 +13,18 @@ logging:
   level:
     root: info
 spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    url:  jdbc:postgresql://localhost:2345/visitor-db
+#    url:  jdbc:postgresql://visitor-db:5432/visitor-db
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        format_sql: true
   main:
     banner-mode: off

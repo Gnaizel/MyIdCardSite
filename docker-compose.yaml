@@ -1,4 +1,15 @@
 services:
+  visitor-db:
+    container_name: visitor-db
+    build: ./
+    image: postgres:16.1
+    ports:
+      - "2345:5432"
+    environment:
+      - POSTGRES_DB=visitor-db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+
   my-site:
     build:
       context: .
@@ -7,3 +18,7 @@ services:
     ports:
       - "80:80"
     restart: unless-stopped
+    environment:
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://visitor-db:5432/visitor-db
