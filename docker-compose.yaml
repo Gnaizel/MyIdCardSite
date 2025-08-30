@@ -1,7 +1,6 @@
 services:
   visitor-db:
     container_name: visitor-db
-    build: ./
     image: postgres:16.1
     ports:
       - "2345:5432"
@@ -9,16 +8,30 @@ services:
       - POSTGRES_DB=visitor-db
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
 
   my-site:
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: my-site
+    build: .
     ports:
       - "80:80"
     restart: unless-stopped
+    depends_on:
+      - visitor-db
     environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://visitor-db:5432/visitor-db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://visitor-db:5432/visitor-db
+      - SERVER_PORT=80
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
