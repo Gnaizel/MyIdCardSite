@@ -20,4 +20,7 @@ public class Track {
     @JsonProperty("@attr")
     private PlayNow attr;
 
+    @Nullable
+    private Date date;
+
 }

@@ -54,7 +54,7 @@ async function fetchTracks() {
     try {
         const response = await fetch('/tracks');
         const tracks = await response.json();
-        displayTracks(tracks.slice(0, 6));
+        displayTracks(tracks.slice(0, 11));
     } catch (err) {
         console.error('Ошибка при получении треков:', err);
     }
@@ -78,6 +78,7 @@ function displayTracks(tracks) {
                 <div class="track-name">${track.name}</div>
                 <div class="track-artist">${track.artist}</div>
             </div>
+            ${!track.attr ? `<div class="track-time-later">${track.timeFromLastListen}</div>` : ''}
         `;
 
         if (track.attr) {
