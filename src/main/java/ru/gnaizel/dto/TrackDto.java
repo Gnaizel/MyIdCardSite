@@ -12,4 +12,5 @@ public class TrackDto {
     private String artist;
     private String imageUrl;
     private boolean attr;
+    private String timeFromLastListen;
 }

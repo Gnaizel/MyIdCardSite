@@ -279,16 +279,17 @@ h3.tagline {
 .track {
     flex: 0 0 auto;
     max-width: 300px;
+    max-height: 70px;
     flex-shrink: 0;
     box-sizing: border-box;
     overflow: hidden;
     line-height: 1.4rem;
-    margin-top: 10px;
+    margin-top: 0;
     display: flex;
     align-items: center;
     background: var(--box-bg);
     transition: transform 0.2s, background 0.2s;
-    border-radius: 15px;
+    border-radius: 20px;
     padding: 10px;
     gap: 10px;
 }
@@ -302,7 +303,8 @@ h3.tagline {
     width: 50px;
     height: 50px;
     object-fit: cover;
-    border-radius: 10px;
+    padding-left: 2px;
+    border-radius: 12px;
     flex-shrink: 0;
 }
 
@@ -318,6 +320,16 @@ h3.tagline {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.track-time-later {
+    height: 0;
+    opacity: 0.4;
+    padding: .5rem;
+    font-size: 14px;
+    font-weight: bold;
+    white-space: nowrap;
+    color: var(--muted);
 }
 
 .track-artist {
@@ -337,6 +349,7 @@ h3.tagline {
     pointer-events: none;
     z-index: 1;
 }
+
 
 .track-list::after {
     right: 0;
@@ -368,13 +381,13 @@ h3.tagline {
     }
 
     .track {
-        width: 100%;
-        margin-top: 8px;
+        line-height: 1.1rem;
+        max-height: 60px;
     }
 
     .track img {
-        width: 50px;
-        height: 50px;
+        width: 40px;
+        height: 40px;
     }
 
     .track-name {
