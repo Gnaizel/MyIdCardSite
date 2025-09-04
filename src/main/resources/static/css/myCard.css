@@ -469,15 +469,20 @@ h3.tagline {
     font-size: .85rem;
 }
 
+.last-game-title {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+}
+
 h2.last-game-title {
-    text-shadow:
-            -1px -1px 0 #000,
-            1px -1px 0 #000,
-            -1px 1px 0 #000,
-            1px 1px 0 #000;
-    color: white; /* Цвет текста */
-    flex-direction: row;
+    color: #fff;
+    font-weight: 700;
     margin-top: 0;
+    text-shadow:
+            0 0 5px #000,
+            0 0 10px #000,
+            0 0 15px #000;
 }
 
 h2.game-title {
@@ -584,6 +589,47 @@ h2.playtime {
 }
 
 /*  для мабилки */
+@media (max-width: 768px) {
+    .game-bar {
+        flex-direction: column;
+        height: auto;
+        border-radius: 20px;
+        width: 100%;
+    }
+
+    .game-left-section,
+    .game-right-section {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 15px;
+        box-sizing: border-box;
+    }
+
+    h2.last-game-title {
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+
+    .game-left-section {
+        align-items: stretch;
+    }
+
+    .game-right-section {
+        border-radius: 0 0 20px 20px;
+    }
+
+    .last-game,
+    .info-box {
+        width: 100% !important;
+        height: 100%;
+        min-height: 40px;
+    }
+
+    .game-lib {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+}
 
 @media (max-width: 768px) {
     .device-card {
