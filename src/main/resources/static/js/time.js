@@ -108,7 +108,7 @@ function displayMyGameLib() {
         .then(rep => rep.json())
         .then(data => {
             displayLastGame(data)
-            displayGameLib(data.slice(0, -1));
+            displayGameLib(data.slice(1));
         })
         .catch(err => {
             console.error("Ошибка при получении или отображении игр:", err);
@@ -124,7 +124,7 @@ function displayLastGame(data) {
         return; 
     }
 
-    const lastGame = data[data.length - 1];
+    const lastGame = data[0];
     const lastGameDiv = document.getElementById('last-game');
 
     if (!lastGameDiv) {
@@ -201,19 +201,15 @@ function displayTotalHours() {
 function setBannerImage(imageUrl) {
     const lastGame = document.getElementById('last-game');
 
-    // Удаляем старый баннер
     const oldBanner = lastGame.querySelector('.banner-image');
     if (oldBanner) oldBanner.remove();
 
-    // Создаем новый баннер
     const banner = document.createElement('div');
     banner.className = 'banner-image';
     banner.style.backgroundImage = `url('${imageUrl}')`;
 
-    // Вставляем баннер
     lastGame.insertBefore(banner, lastGame.firstChild);
 
-    // Запускаем анимацию появления
     setTimeout(() => {
         banner.style.opacity = '1';
     }, 10);
