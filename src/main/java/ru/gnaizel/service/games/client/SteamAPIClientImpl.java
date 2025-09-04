@@ -5,14 +5,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
-import ru.gnaizel.dto.games.GRPGSteamResponseDto;
 import ru.gnaizel.dto.games.GOGSteamResponseDto;
+import ru.gnaizel.dto.games.GRPGSteamResponseDto;
 import ru.gnaizel.dto.games.SteamOwnedGamesResponse;
 import ru.gnaizel.dto.games.SteamRecentGamesResponse;
 import ru.gnaizel.exception.SteamApiResponseException;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -56,9 +55,9 @@ public class SteamAPIClientImpl implements SteamAPIClient {
                 "format=json";
         List<GOGSteamResponseDto> games = new ArrayList<>();
         try {
-             games = template.getForObject(url, SteamOwnedGamesResponse.class)
-                     .getResponse()
-                     .getGames();
+            games = template.getForObject(url, SteamOwnedGamesResponse.class)
+                    .getResponse()
+                    .getGames();
         } catch (HttpClientErrorException e) {
             log.error("STEAM API ERROR: " + e.getMessage());
         }

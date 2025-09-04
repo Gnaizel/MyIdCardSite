@@ -7,5 +7,6 @@ import java.util.List;
 
 public interface SteamAPIClient {
     List<GRPGSteamResponseDto> getLastActivity();
+
     List<GOGSteamResponseDto> getAllGameLib();
 }

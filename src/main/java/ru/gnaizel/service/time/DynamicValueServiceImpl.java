@@ -14,7 +14,7 @@ public class DynamicValueServiceImpl implements DynamicValueService {
 
         DateTimeFormatter formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
-        return  now.format(formatter);
+        return now.format(formatter);
     }
 
     @Override

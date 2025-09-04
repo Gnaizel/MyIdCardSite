@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,7 +14,7 @@ public class GameDto {
 
     String playtime_2weeks;
 
-    String  playtime_forever;
+    String playtime_forever;
 
     int playtime_windows_forever;
 
@@ -26,7 +24,7 @@ public class GameDto {
 
     String banner_url;
 
-    String  rtime_last_played;
+    String rtime_last_played;
 
     int playtime_disconnected;
 }

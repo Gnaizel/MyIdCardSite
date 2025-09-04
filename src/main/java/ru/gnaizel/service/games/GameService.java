@@ -6,5 +6,6 @@ import java.util.List;
 
 public interface GameService {
     List<GameDto> getRecentlyGames();
+
     double getTotalHours();
 }

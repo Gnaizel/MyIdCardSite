@@ -13,7 +13,7 @@ public class MainController {
     private final UserService userService;
 
     @GetMapping("/")
-    public String  getCard(Model model, HttpServletRequest request) {
+    public String getCard(Model model, HttpServletRequest request) {
         String ip = getClientIpAddress(request);
         userService.addVisit(ip);
         return "myCard";
