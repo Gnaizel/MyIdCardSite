@@ -9,9 +9,15 @@ server:
     enabled: true
 last.fm:
   api-token: "f8af34f52c1a0b81338eec49308b2e44"
+
+steam:
+  id: "76561199046881676"
+  api-token: "E398060D2847B001C94ED9A71ED2D4DD"
+
 logging:
   level:
     root: info
+
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver

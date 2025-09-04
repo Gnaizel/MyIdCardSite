@@ -56,7 +56,7 @@ ul li {
 /* Контакты в линию */
 .social ul {
     display: flex;
-    gap: 5px;
+    gap: 10px;
     flex-wrap: wrap;
 }
 
@@ -354,6 +354,233 @@ h3.tagline {
 .track-list::after {
     right: 0;
     background: linear-gradient(to left, var(--bg), transparent);
+}
+
+.game-bar {
+    display: flex;
+    height: 300px;
+    border-radius: 40px 0 0 40px;
+    border: 2px solid #000000;
+    margin-top: -15px;
+    width: 100%;
+    background: rgba(7, 7, 7, 1);
+}
+
+.game-left-section {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 19px;
+    width: 40%;
+}
+
+.last-game {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    border-radius: 20px;
+    overflow: hidden;
+    height: 200px;
+    background: var(--box-bg);
+    width: 100%;
+    position: relative;
+}
+
+.banner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.7) 0%,
+            rgba(0, 0, 0, 0.5) 33%,
+            rgba(0, 0, 0, 0.3) 66%,
+            rgba(0, 0, 0, 0) 100%
+    );
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+}
+
+.banner-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    background-size: cover;
+    background-position: center;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+
+    mask-image: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 1) 0%,
+            rgba(0, 0, 0, 0.8) 20%,
+            rgba(0, 0, 0, 0.6) 40%,
+            rgba(0, 0, 0, 0.4) 60%,
+            rgba(0, 0, 0, 0.2) 80%,
+            rgba(0, 0, 0, 0) 100%
+    );
+    -webkit-mask-image: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 1) 0%,
+            rgba(0, 0, 0, 0.8) 20%,
+            rgba(0, 0, 0, 0.6) 40%,
+            rgba(0, 0, 0, 0.4) 60%,
+            rgba(0, 0, 0, 0.2) 80%,
+            rgba(0, 0, 0, 0) 100%
+    );
+}
+
+
+.game-head,
+.game-information {
+    position: relative;
+    z-index: 2;
+}
+
+.game-head {
+    overflow: hidden;
+    display: flex;
+    gap: .9rem;
+    flex-direction: row;
+}
+
+.game-information {
+    display: flex;
+    padding-left: .5rem;
+    flex-direction: column;
+    align-items: start;
+}
+
+.game-information h3 {
+    line-height: 0;
+}
+
+.game-title {
+    font-size: .85rem;
+}
+
+h2.last-game-title {
+    text-shadow:
+            -1px -1px 0 #000,
+            1px -1px 0 #000,
+            -1px 1px 0 #000,
+            1px 1px 0 #000;
+    color: white; /* Цвет текста */
+    flex-direction: row;
+    margin-top: 0;
+}
+
+h2.game-title {
+    flex-direction: row;
+    margin-top: 0;
+}
+
+.info-box {
+    box-sizing: border-box;
+    display: flex;
+    overflow: hidden;
+    justify-items: start;
+    padding-left: 15px;
+    align-items: center;
+    border-radius: 20px;
+    background: var(--box-bg);
+    height: 50px;
+    width: 100%;
+}
+
+.game-section {
+    display: flex;
+    gap: 15px;
+    flex-direction: column;
+}
+
+.last-game img {
+    height: 60px;
+    width: 60px;
+    border: 1px solid #000000;
+    border-radius: 10px;
+}
+
+.game-right-section {
+    padding: 0;
+    display: flex;
+    width: 50%;
+    margin-left: auto;
+    border-radius: 30px 0 0 30px;
+    background: linear-gradient(270deg, rgba(0, 0, 0, 0.8) 0%,
+    rgba(12,12,12,1) 30%,
+    rgb(12, 12, 12) 100%);
+    overflow: hidden;
+}
+
+.game-lib {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    max-height: 100vh;
+}
+
+.game-lib::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.game-lib::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.game-lib::-webkit-scrollbar-thumb {
+    background: transparent;
+}
+
+.game-lib::-webkit-scrollbar-thumb:hover {
+    background: transparent;
+}
+
+/* Скрываем scrollbar для Firefox */
+.game-lib {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE и Edge */
+}
+
+.game {
+    align-items: center;
+    display: flex;
+    box-sizing: border-box;
+    gap: 10px;
+}
+
+h2.playtime {
+    margin: 0;
+}
+
+.game-info {
+    width: 80%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    gap: 5px;
+    flex-direction: column;
+}
+
+.game img {
+    border-radius: 10px;
+    height: 40px;
+    width: 40px;
 }
 
 /*  для мабилки */

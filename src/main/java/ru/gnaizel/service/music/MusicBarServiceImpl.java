@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import ru.gnaizel.dto.TrackDto;
+import ru.gnaizel.dto.music.TrackDto;
 import ru.gnaizel.exception.RequestForTrecksException;
 import ru.gnaizel.mapper.music.LastFmMapper;
 import ru.gnaizel.model.music.LastFmResponse;

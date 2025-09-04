@@ -102,3 +102,122 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+
+function displayMyGameLib() {
+    fetch('/games')
+        .then(rep => rep.json())
+        .then(data => {
+            displayLastGame(data)
+            displayGameLib(data.slice(0, -1));
+        })
+        .catch(err => {
+            console.error("Ошибка при получении или отображении игр:", err);
+
+            const gameLib = document.getElementById('game-lib');
+            gameLib.innerHTML = '<p>Ошибка загрузки игр.</p>';
+        })
+}
+
+function displayLastGame(data) {
+    if (!data || data.length === 0) {
+        console.warn("Нет данных для отображения последней игры.");
+        return; 
+    }
+
+    const lastGame = data[data.length - 1];
+    const lastGameDiv = document.getElementById('last-game');
+
+    if (!lastGameDiv) {
+        console.warn("Элемент с id 'last-game' не найден.");
+        return;
+    }
+
+    lastGameDiv.innerHTML = '';
+
+    const gameHead = document.createElement('div');
+    gameHead.classList.add('game-head');
+
+    gameHead.innerHTML = `
+        <img src="${lastGame.img_icon_url}" alt="game-icon">
+        <h2 class="last-game-title">${lastGame.name}</h2>`;
+
+    const gameInformation = document.createElement('div');
+    gameInformation.classList.add('game-information');
+
+    gameInformation.innerHTML = `
+        <h3 class="playtime-forever">Playtime forever: ${lastGame.playtime_forever}</h3>
+        <h3 class="playtime-2weeks"> Playtime 2weeks: ${lastGame.playtime_2weeks}</h3>
+        <h3 class="playtime-sessions">Last played: ${lastGame.rtime_last_played}</h3>
+    `;
+    setBannerImage(`${lastGame.banner_url}`);
+    displayTotalHours();
+
+    lastGameDiv.appendChild(gameHead);
+    lastGameDiv.appendChild(gameInformation);
+}
+
+function displayGameLib(data) {
+    const gameLib = document.getElementById('game-lib');
+    gameLib.innerHTML = ``;
+
+    data.forEach(game => {
+        const gameElement = document.createElement('div');
+        gameElement.classList.add('game');
+
+        gameElement.innerHTML = `
+                    <img src="${game.img_icon_url}" alt="game-icon">
+                    <div class="game-info">
+                        <div class="game-title">${game.name}</div>
+                        <div class="playtime-forever">${game.playtime_forever}</div>
+                    </div>`;
+        gameLib.appendChild(gameElement);
+    })
+}
+
+function displayTotalHours() {
+    const totalHoursEl = document.getElementById('playtime-in-total');
+    if (!totalHoursEl) return;
+
+    totalHoursEl.innerHTML = '';
+
+    fetch('games-total-hours')
+        .then(resp => {
+            if (!resp.ok) throw new Error('Network response was not ok');
+            return resp.text();
+        })
+        .then(data => {
+            const trimmed = data.trim();
+            // Попробуем преобразовать в число для валидации
+            const num = Number(trimmed);
+            const display = Number.isFinite(num) ? num.toLocaleString(undefined, { maximumFractionDigits: 2 }) : trimmed;
+            totalHoursEl.innerHTML = `<h2 class="playtime">Total hours: ${display}</h2>`;
+        })
+        .catch(err => {
+            console.error(err);
+            totalHoursEl.innerHTML = `<h2 class="playtime">Total hours: unavailable</h2>`;
+        });
+}
+
+function setBannerImage(imageUrl) {
+    const lastGame = document.getElementById('last-game');
+
+    // Удаляем старый баннер
+    const oldBanner = lastGame.querySelector('.banner-image');
+    if (oldBanner) oldBanner.remove();
+
+    // Создаем новый баннер
+    const banner = document.createElement('div');
+    banner.className = 'banner-image';
+    banner.style.backgroundImage = `url('${imageUrl}')`;
+
+    // Вставляем баннер
+    lastGame.insertBefore(banner, lastGame.firstChild);
+
+    // Запускаем анимацию появления
+    setTimeout(() => {
+        banner.style.opacity = '1';
+    }, 10);
+}
+
+displayMyGameLib();
+setInterval(displayMyGameLib, 60000)

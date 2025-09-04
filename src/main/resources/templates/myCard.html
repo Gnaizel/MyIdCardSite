@@ -8,124 +8,192 @@
     <title>Gnaizel</title>
 </head>
 <body>
-<div class="title-block">
-    <header>
-        <div class="profile">
-            <img src="/image/photo_2025-08-24_16-06-35.jpg" alt="avatar">
-            <div>
-                <h1 class="nick"><span class="p-marks">@</span>Gnaizel</h1>
-                <h2 class="tagline">Backend Developer</h2>
+    <div class="title-block">
+        <header>
+            <div class="profile">
+                <img src="/image/photo_2025-08-24_16-06-35.jpg" alt="avatar">
+                <div>
+                    <h1 class="nick"><span class="p-marks">@</span>Gnaizel</h1>
+                    <h2 class="tagline">Backend Developer</h2>
+                </div>
             </div>
-        </div>
-<!--        <div class="theme-toggle">☀️/🌙</div>-->
-    </header>
-</div>
+    <!--        <div class="theme-toggle">☀️/🌙</div>-->
+        </header>
+    </div>
 
-<div class="main">
+    <div class="main">
 
-    <section class="bio">
-        <h2><span class="p-marks">//</span> Bio</h2>
-        <ul class="list">
-            <li><span class="p-marks">-</span> location: Saratov/Russia</li>
-            <li><span class="p-marks">-</span> local time: <span id="time"></span></li>
-            <li><span class="p-marks">-</span> timezone: UTC+4</li>
-            <li><span class="p-marks">-</span> age: <span id="old"></span></li>
-        </ul>
-    </section>
-
-    <section class="social">
-        <h2><span class="p-marks">//</span> Social</h2>
-        <ul class="list">
-            <li>
-                <div class="contact-box">
-                    <img src="/image/github-svgrepo-com.svg" alt="icon">
-                    <a href="https://github.com/Gnaizel">github</a>
-                </div>
-            </li>
-            <li>
-                <div class="contact-box">
-                    <img src="/image/steam-svgrepo-com.svg" alt="icon">
-                    <a href="https://steamcommunity.com/id/Gnaisel/">steam</a>
-                </div>
-            </li>
-            <li>
-                <div class="contact-box">
-                    <img src="/image/telegram-svgrepo-com.svg" alt="icon">
-                    <a href="https://telegram.me/gnaizel">telegram</a>
-                </div>
-            </li>
-            <li>
-                <div class="contact-box">
-                    <img src="/image/last-fm-white-icon.svg" alt="icon">
-                    <a href="https://www.last.fm/user/Gnaizel">last.fm</a>
-                </div>
-            </li>
-        </ul>
-    </section>
-
-    <section class="tech-stack">
-        <h2><span class="p-marks">//</span> Skills</h2>
-        <div class="skills-list">
-            <span class="skill-chip">Java</span>
-            <span class="skill-chip">Spring Boot</span>
-            <span class="skill-chip">Docker</span>
-            <span class="skill-chip">PostgreSQL</span>
-            <span class="skill-chip">Git</span>
-        </div>
-    </section>
-
-    <section class="device">
-        <h2><span class="p-marks">//</span> Device</h2>
-        <div class="device-card">
-            <div class="device-header">💻 laptop</div>
-            <ul class="device-specs">
-                <li>intel(R) UHD Graphics</li>
-                <li>8G RAM</li>
-                <li>i5-12450H</li>
-                <li>500G DISK</li>
+        <section class="bio">
+            <h2><span class="p-marks">//</span> Bio</h2>
+            <ul class="list">
+                <li><span class="p-marks">-</span> location: Saratov/Russia</li>
+                <li><span class="p-marks">-</span> local time: <span id="time"></span></li>
+                <li><span class="p-marks">-</span> timezone: UTC+4</li>
+                <li><span class="p-marks">-</span> age: <span id="old"></span></li>
             </ul>
-        </div>
-        <div class="device-card">
-            <div class="device-header">🖥️ pc</div>
-            <ul class="device-specs">
-                <li>GeForce GTX 1660 SUPER</li>
-                <li>16G RAM</li>
-                <li>i7-11700K</li>
-                <li>3TB DISK</li>
+        </section>
+
+        <section class="social">
+            <h2><span class="p-marks">//</span> Social</h2>
+            <ul class="list">
+                <li>
+                    <div class="contact-box">
+                        <img src="/image/github-svgrepo-com.svg" alt="icon">
+                        <a href="https://github.com/Gnaizel">github</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="contact-box">
+                        <img src="/image/steam-svgrepo-com.svg" alt="icon">
+                        <a href="https://steamcommunity.com/id/Gnaisel/">steam</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="contact-box">
+                        <img src="/image/telegram-svgrepo-com.svg" alt="icon">
+                        <a href="https://telegram.me/gnaizel">telegram</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="contact-box">
+                        <img src="/image/last-fm-white-icon.svg" alt="icon">
+                        <a href="https://www.last.fm/user/Gnaizel">last.fm</a>
+                    </div>
+                </li>
             </ul>
-        </div>
-        <div class="device-card">
-            <div class="device-header">🗄️ server</div>
-            <ul class="device-spece">
-                <li>16G RAM</li>
-                <li>Intel i5-9400F</li>
-                <li>1.8TB DISK</li>
-            </ul>
-        </div>
-    </section>
+        </section>
 
-    <section class="player">
-        <div class="title">
-            <h2><span class="p-marks">//</span> Player</h2>
-            <h3 class="tagline"> The last tracks I listened to</h3>
-        </div>
-        <div class="track-list">
-            <div id="track-list" class="track-column"></div>
-        </div>
-    </section>
+        <section class="tech-stack">
+            <h2><span class="p-marks">//</span> Skills</h2>
+            <div class="skills-list">
+                <span class="skill-chip">Java</span>
+                <span class="skill-chip">Spring Boot</span>
+                <span class="skill-chip">Docker</span>
+                <span class="skill-chip">PostgreSQL</span>
+                <span class="skill-chip">Git</span>
+            </div>
+        </section>
 
-    <footer>
-        <div id="quote">// Ага</div>
-        <div>number of visits: <span id="number-of-visits"></span></div>
-    </footer>
+        <section class="device">
+            <h2><span class="p-marks">//</span> Device</h2>
+            <div class="device-card">
+                <div class="device-header">💻 laptop</div>
+                <ul class="device-specs">
+                    <li>intel(R) UHD Graphics</li>
+                    <li>8G RAM</li>
+                    <li>i5-12450H</li>
+                    <li>500G DISK</li>
+                </ul>
+            </div>
+            <div class="device-card">
+                <div class="device-header">🖥️ pc</div>
+                <ul class="device-specs">
+                    <li>GeForce GTX 1660 SUPER</li>
+                    <li>16G RAM</li>
+                    <li>i7-11700K</li>
+                    <li>3TB DISK</li>
+                </ul>
+            </div>
+            <div class="device-card">
+                <div class="device-header">🗄️ server</div>
+                <ul class="device-spece">
+                    <li>16G RAM</li>
+                    <li>Intel i5-9400F</li>
+                    <li>1.8TB DISK</li>
+                </ul>
+            </div>
+        </section>
 
-<!--    <section class="game">-->
-<!--        <h2><span class="p-marks">//</span> Game</h2>-->
-<!--        <table>-->
-<!--            <tr><td>CS 2</td><td>info for hours</td></tr>-->
-<!--        </table>-->
-<!--    </section> в процессе-->
+        <section class="player">
+            <div class="title">
+                <h2><span class="p-marks">//</span> Player</h2>
+                <h3 class="tagline"> The last tracks I listened to</h3>
+            </div>
+            <div class="track-list">
+                <div id="track-list" class="track-column"></div>
+            </div>
+        </section>
 
-</div>
+
+        <section class="game-section">
+            <div class="title">
+                <h2><span class="p-marks">//</span> Games</h2>
+                <h3 class="tagline"> My game library</h3>
+            </div>
+
+            <div class="game-bar">
+                <div class="game-left-section">
+                    <div id="last-game" class="last-game">
+                        <div class="banner-background"></div>
+                        <div class="game-head">
+                            <img src="/image/game-icon.jpg" alt="game-icon">
+                            <h2 class="last-game-title">game title</h2>
+                        </div>
+                        <div class="game-information">
+                            <h3 class="playtime-forever">Playtime forever: </h3>
+                            <h3 class="playtime-2weeks"> playtime 2weeks: </h3>
+                            <h3 class="playtime-sessions">Sessions: </h3>
+                        </div>
+                    </div>
+                    <div class="info-box">
+                        <div id="playtime-in-total" class="playtime-in-total">
+                            <h2 class="playtime">Total hours: </h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="game-right-section">
+                    <div id="game-lib" class="game-lib">
+                        <div class="game">
+                            <img src="/image/game-icon.jpg" alt="game-icon">
+                            <div class="game-info">
+                                <div class="game-title">game name</div>
+                                <div class="playtime-forever">3h</div>
+                            </div>
+                        </div>
+                        <div class="game">
+                            <img src="/image/game-icon.jpg" alt="game-icon">
+                            <div class="game-info">
+                                <div class="game-title">Milk inside a bag of milk inside a bag of milk</div>
+                                <div class="playtime-forever">3h</div>
+                            </div>
+                        </div>
+                        <div class="game">
+                            <img src="/image/game-icon.jpg" alt="game-icon">
+                            <div class="game-info">
+                                <div class="game-title">game name</div>
+                                <div class="playtime-forever">3h</div>
+                            </div>
+                        </div>
+                        <div class="game">
+                            <img src="/image/game-icon.jpg" alt="game-icon">
+                            <div class="game-info">
+                                <div class="game-title">game name</div>
+                                <div class="playtime-forever">3h</div>
+                            </div>
+                        </div>
+                        <div class="game">
+                            <img src="/image/game-icon.jpg" alt="game-icon">
+                            <div class="game-info">
+                                <div class="game-title">game name</div>
+                                <div class="playtime-forever">3h</div>
+                            </div>
+                        </div>
+                        <div class="game">
+                            <img src="/image/game-icon.jpg" alt="game-icon">
+                            <div class="game-info">
+                                <div class="game-title">game name</div>
+                                <div class="playtime-forever">3h</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div id="quote">// Ага</div>
+            <div>number of visits: <span id="number-of-visits"></span></div>
+        </footer>
+    </div>
 </body>
 </html>

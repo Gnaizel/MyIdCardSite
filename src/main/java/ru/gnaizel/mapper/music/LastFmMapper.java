@@ -2,7 +2,7 @@ package ru.gnaizel.mapper.music;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import ru.gnaizel.dto.TrackDto;
+import ru.gnaizel.dto.music.TrackDto;
 import ru.gnaizel.model.music.Image;
 import ru.gnaizel.model.music.LastFmResponse;
 import ru.gnaizel.model.music.PlayNow;

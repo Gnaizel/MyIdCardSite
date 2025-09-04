@@ -1,6 +1,6 @@
 package ru.gnaizel.service.music;
 
-import ru.gnaizel.dto.TrackDto;
+import ru.gnaizel.dto.music.TrackDto;
 
 import java.util.List;
 

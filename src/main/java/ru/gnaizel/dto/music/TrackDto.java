@@ -1,4 +1,4 @@
-package ru.gnaizel.dto;
+package ru.gnaizel.dto.music;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
