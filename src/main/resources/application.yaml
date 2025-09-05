@@ -1,19 +1,19 @@
 server:
   port: 443
-#  ssl:
-##    key-alias: tomcat
-#    key-store-type: PKCS12
-#    key-store: classpath:javabegin_ssl.p12
-#    key-store-password: root
-#  http2:
-#    enabled: true
+  ssl:
+    key-alias: tomcat
+    key-store-type: PKCS12
+    key-store: classpath:javabegin_ssl.p12
+    key-store-password: root
+  http2:
+    enabled: true
 
 last.fm:
-  api-token: "f8af34f52c1a0b81338eec49308b2e44"
+  api-token: "key"
 
 steam:
-  id: "76561199046881676"
-  api-token: "E398060D2847B001C94ED9A71ED2D4DD"
+  id: "id"
+  api-token: "key"
 
 logging:
   level:
@@ -22,10 +22,10 @@ logging:
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: postgres
-    url: jdbc:postgresql://localhost:2346/visitor-db
-  #    url:  jdbc:postgresql://visitor-db:5432/visitor-db
+    username: username
+    password: pass
+#    url: jdbc:postgresql://localhost:2346/visitor-db
+    url:  jdbc:postgresql://visitor-db:5432/visitor-db
   jpa:
     hibernate:
       ddl-auto: update
