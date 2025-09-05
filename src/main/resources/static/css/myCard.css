@@ -56,7 +56,7 @@ ul li {
 /* Контакты в линию */
 .social ul {
     display: flex;
-    gap: 10px;
+    column-gap: 10px;
     flex-wrap: wrap;
 }
 
@@ -173,7 +173,7 @@ footer {
     gap: 1rem;
     flex-wrap: wrap;
     justify-content: space-between;
-    margin-top: .5rem;
+    margin-top: 1rem;
 }
 
 .device h2 {
@@ -595,6 +595,12 @@ h2.playtime {
         height: auto;
         border-radius: 20px;
         width: 100%;
+    }
+
+    .game-right-section {
+        background: linear-gradient( 360deg, rgba(0, 0, 0, 0.8) 0%,
+        rgba(12, 12, 12, 1) 30%,
+        rgb(12, 12, 12) 100%);
     }
 
     .game-left-section,
