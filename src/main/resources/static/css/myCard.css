@@ -168,15 +168,15 @@ footer {
     font-size: .8rem;
 }
 
-.device {
+.device-cards {
     display: flex;
     gap: 1rem;
     flex-wrap: wrap;
-    justify-content: space-between;
+    justify-content: start;
     margin-top: 1rem;
 }
 
-.device h2 {
+.device-cards h2 {
     width: 100%;
     margin: 0 0 0.5rem 0;
 }
@@ -638,16 +638,47 @@ h2.playtime {
 }
 
 @media (max-width: 768px) {
-    .device-card {
-        padding: 1rem;
-        background: var(--box-bg);
-        border-radius: 10px;
+
+    .device-cards {
         display: flex;
-        width: 100%;
-        gap: .6rem;
-        flex-direction: column;
-        transition: transform .2s, background .2s;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        gap: 1rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: .5rem;
     }
+
+    .device-cards h2 {
+        display: flex;
+        flex: 0 0 100%;
+    }
+
+    .device-card {
+        flex: 0 0 auto;
+        min-width: max-content;
+        scroll-snap-align: start;
+    }
+
+    @media (hover: hover) {
+        .device-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.08);
+        }
+    }
+
+    /*.device-card {*/
+    /*    padding: 1rem;*/
+    /*    background: var(--box-bg);*/
+    /*    border-radius: 10px;*/
+    /*    display: flex;*/
+    /*    width: 100%;*/
+    /*    gap: .6rem;*/
+    /*    flex-direction: column;*/
+    /*    transition: transform .2s, background .2s;*/
+    /*}*/
 
     .track-list {
         flex-direction: row;
@@ -689,9 +720,9 @@ h2.playtime {
         font-size: 1rem;
     }
 
-    .device td {
-        font-size: 13px;
-    }
+    /*.device td {*/
+    /*    font-size: 13px;*/
+    /*}*/
 }
 
 @media (max-width: 480px) {
@@ -707,17 +738,17 @@ h2.playtime {
         font-size: 0.9rem;
     }
 
-    .device td {
+    .device-cards td {
         font-size: 12px;
     }
 }
 
-.device td:first-child {
+.device-cards td:first-child {
     font-weight: bold;
     padding-right: 12px;
     white-space: nowrap;
 }
 
-.device td:last-child {
+.device-cards td:last-child {
     padding-left: 8px;
 }
