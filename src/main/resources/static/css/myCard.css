@@ -180,6 +180,7 @@ footer {
     display: flex;
     box-sizing: border-box;
     flex-direction: row;
+    align-items: center;
     gap: 8px;
 }
 
@@ -747,7 +748,7 @@ h2.playtime {
     }
 
     h2 {
-        font-size: 0.9rem;
+        font-size: 1rem;
     }
 
     .device-cards td {
