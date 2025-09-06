@@ -176,6 +176,18 @@ footer {
     margin-top: 1rem;
 }
 
+.playtime-in-total {
+    display: flex;
+    box-sizing: border-box;
+    flex-direction: row;
+    gap: 8px;
+}
+
+.playtime-in-total img {
+    width: 20px;
+    height: 20px;
+}
+
 .device-cards h2 {
     width: 100%;
     margin: 0 0 0.5rem 0;

@@ -187,14 +187,16 @@ function displayTotalHours() {
         })
         .then(data => {
             const trimmed = data.trim();
-            // Попробуем преобразовать в число для валидации
             const num = Number(trimmed);
             const display = Number.isFinite(num) ? num.toLocaleString(undefined, { maximumFractionDigits: 2 }) : trimmed;
-            totalHoursEl.innerHTML = `<h2 class="playtime">Total hours: ${display}</h2>`;
+            totalHoursEl.innerHTML = `
+                <img src="/image/clock.png" alt="time-img">
+                <h2 class="playtime">All Time: ${display}</h2>
+            `;
         })
         .catch(err => {
             console.error(err);
-            totalHoursEl.innerHTML = `<h2 class="playtime">Total hours: unavailable</h2>`;
+            totalHoursEl.innerHTML = `<h2 class="playtime">All Time: unavailable</h2>`;
         });
 }
 
