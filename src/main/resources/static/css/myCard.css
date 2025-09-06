@@ -168,12 +168,70 @@ footer {
     font-size: .8rem;
 }
 
+.device-card img {
+    height: 1rem;
+    width: 1rem;
+}
+
 .device-cards {
     display: flex;
     gap: 1rem;
-    flex-wrap: wrap;
-    justify-content: start;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
     margin-top: 1rem;
+    padding-bottom: 1rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    position: relative;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.device-cards-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, var(--bg));
+    pointer-events: none;
+    opacity: 1;
+    z-index: 2;
+}
+
+.device-cards::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.device-cards::-webkit-scrollbar-track {
+    background: var(--box-bg);
+    border-radius: 3px;
+}
+
+.device-cards::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.device-cards::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.device-card {
+    padding: 1rem;
+    background: var(--box-bg);
+    border-radius: 10px;
+    display: flex;
+    flex-shrink: 0;
+    gap: .6rem;
+    flex-direction: column;
+    transition: transform .2s, background .2s;
+    scroll-behavior: smooth;
 }
 
 .playtime-in-total {
@@ -205,14 +263,9 @@ footer {
     background: rgba(255, 255, 255, 0.08);
 }
 
-.device-card {
-    padding: 1rem;
-    background: var(--box-bg);
-    border-radius: 10px;
-    display: flex;
-    gap: .6rem;
-    flex-direction: column;
-    transition: transform .2s, background .2s;
+.device-cards-container {
+    position: relative;
+    width: 100%;
 }
 
 .player {

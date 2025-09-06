@@ -174,6 +174,19 @@ function displayGameLib(data) {
     })
 }
 
+document.addEventListener('DOMContentLoaded', function() {
+    const deviceCards = document.querySelector('.device-cards');
+
+    if (deviceCards) {
+        deviceCards.addEventListener('wheel', function(e) {
+            if (e.deltaY !== 0) {
+                e.preventDefault();
+                this.scrollLeft += e.deltaY;
+            }
+        });
+    }
+});
+
 function displayTotalHours() {
     const totalHoursEl = document.getElementById('playtime-in-total');
     if (!totalHoursEl) return;

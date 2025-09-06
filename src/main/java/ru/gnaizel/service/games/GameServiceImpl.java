@@ -44,9 +44,8 @@ public class GameServiceImpl implements GameService {
             throw new GameFiltrationError("ERROR IN getRecentlyGames: games list is empty");
         }
 
-        Collections.reverse(games);
-
         return games.stream()
+                .sorted(Comparator.comparing(Game::getRtime_last_played).reversed())
                 .map(GameMapper::gameToGameDto)
                 .toList();
     }
