@@ -62,7 +62,7 @@ public class GameMapper {
         }
 
         Instant lastPlayedInstant = Instant.ofEpochSecond(GOG.getRtime_last_played());
-        LocalDateTime lastPlayed = LocalDateTime.ofInstant(lastPlayedInstant, ZoneId.systemDefault());
+        LocalDateTime lastPlayed = LocalDateTime.ofInstant(lastPlayedInstant, ZoneId.of("UTC+4"));
 
 
         Game game = new Game();
