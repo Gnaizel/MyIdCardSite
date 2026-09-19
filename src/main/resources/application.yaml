@@ -49,7 +49,7 @@ fortnite:
   # по appid, а у Fortnite его нет, поэтому лежат в static своими файлами.
   title: ${FORTNITE_TITLE:Fortnite}
   icon: ${FORTNITE_ICON:/image/fortnite.svg}
-  banner: ${FORTNITE_BANNER:/image/fortnite-banner.svg}
+  banner: ${FORTNITE_BANNER:/image/fortnite-banner.jpg}
 
 guestbook:
   # Пока ключ пустой, админские ручки закрыты наглухо и отвечают 401.
