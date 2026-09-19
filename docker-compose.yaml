@@ -2,12 +2,19 @@ services:
   visitor-db:
     container_name: visitor-db
     image: postgres:16.1
+    restart: unless-stopped
     ports:
-      - "2346:5432"
+      # 127.0.0.1 обязателен: без него на публичном сервере база с логином
+      # postgres/postgres торчала бы в интернет. Порт остаётся для psql и IDE
+      # с самой машины (или через ssh -L).
+      - "127.0.0.1:2346:5432"
     environment:
       - POSTGRES_DB=visitor-db
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      # Без тома гостевая книга умирает вместе с контейнером.
+      - visitor-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -19,18 +26,62 @@ services:
   my-site:
     container_name: my-site
     build: .
-    ports:
-      - "443:443"
     restart: unless-stopped
     depends_on:
-      - visitor-db
+      visitor-db:
+        condition: service_healthy
+    ports:
+      # Только localhost: снаружи до приложения ходят исключительно через Caddy,
+      # иначе сайт открывался бы по http://IP:8080 в обход https.
+      - "127.0.0.1:8080:8080"
+    # Ключи подтягиваются из .env рядом с этим файлом.
+    env_file:
+      - path: .env
+        required: false
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://visitor-db:5432/visitor-db
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      # Оба флага имеют смысл только вместе с прокси впереди, а он тут есть.
+      # Caddy перезаписывает X-Forwarded-For своим значением, так что подделать
+      # адрес клиент не может.
+      - TRUST_FORWARDED_FOR=true
+      - FORWARD_HEADERS_STRATEGY=framework
+    networks:
+      - app-network
+
+  caddy:
+    container_name: caddy
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      # HTTP/3 — тот же 443, но UDP.
+      - "443:443/udp"
+    environment:
+      # Оба значения берутся из .env. Дефолт localhost — чтобы случайный
+      # docker compose up на ноутбуке не ломился в Let's Encrypt за
+      # сертификатом: для localhost Caddy выпишет свой, локальный.
+      # На сервере SITE_DOMAIN и ACME_EMAIL обязаны быть заданы.
+      - SITE_DOMAIN=${SITE_DOMAIN:-localhost}
+      - ACME_EMAIL=${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # caddy-data хранит сами сертификаты и ключ аккаунта Let's Encrypt.
+      # Потерять его = выпускать всё заново и упереться в лимиты LE.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - my-site
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  visitor-db-data:
+  caddy-data:
+  caddy-config:

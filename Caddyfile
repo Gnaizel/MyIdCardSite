@@ -1,0 +1,46 @@
+# Caddy сам получает сертификат Let's Encrypt, сам его продлевает и сам
+# редиректит http -> https. Никакого certbot и cron не нужно.
+# Домен и почта берутся из .env (SITE_DOMAIN, ACME_EMAIL).
+{
+	# Почта, на которую Let's Encrypt напишет, если продление сломается.
+	# Кавычки обязательны: без них пустой ACME_EMAIL разворачивается в
+	# "email" без аргумента, и Caddy не стартует вообще. С кавычками
+	# пустое значение просто означает "без почты" — сертификат всё равно
+	# выпустится, только писем не будет.
+	email "{$ACME_EMAIL}"
+}
+
+{$SITE_DOMAIN} {
+	# Весь http-трафик на этот домен Caddy редиректит на https сам, 308-м.
+
+	encode zstd gzip
+
+	header {
+		# Год: браузер, один раз побывав здесь, больше не пойдёт по http вообще.
+		# includeSubDomains намеренно нет — иначе будущий поддомен без TLS
+		# окажется недоступен, и до года это не откатить.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		# Версию сервера наружу не отдаём.
+		-Server
+	}
+
+	# Actuator приезжает вместе со spring-boot-starter-actuator и наружу не нужен.
+	@internal path /actuator /actuator/*
+	respond @internal 404
+
+	# X-Forwarded-For Caddy проставляет сам и чужой заголовок затирает, а не
+	# дописывает к нему свой: подделать адрес клиент не может. Это важно —
+	# гостевая книга берёт из списка первый адрес и считает по нему лимиты.
+	# Ломается это только если задать глобальный trusted_proxies: тогда
+	# заголовку клиента начнут верить.
+	reverse_proxy my-site:8080
+}
+
+# www -> апекс. Если A-записи для www нет, удали этот блок целиком:
+# иначе Caddy будет впустую ломиться за сертификатом, которого не выдадут.
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
