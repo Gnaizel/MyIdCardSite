@@ -53,6 +53,10 @@ public class AvatarServiceImpl implements AvatarService {
        поэтому размер проверяется по заголовку, до распаковки. */
     private static final long MAX_PIXELS = 12_000_000L;
 
+    /* Сторона картинки, по которой ищется самое насыщенное место. Двухсот
+       точек хватает: ищем область, а не деталь. */
+    private static final int ANALYSIS = 200;
+
     private final ResourceLoader resourceLoader;
 
     @Value("${avatar.dir:./data}")
@@ -154,13 +158,19 @@ public class AvatarServiceImpl implements AvatarService {
         }
     }
 
-    /* Обрезаем по центру до квадрата, а не сжимаем прямоугольник: на карточке
-       стоит object-fit: cover, и вытянутое фото там всё равно обрежется —
-       лучше сделать это один раз здесь и не возить лишние байты. */
+    /* Обрезаем до квадрата, а не сжимаем прямоугольник: на карточке стоит
+       object-fit: cover, и вытянутое фото там всё равно обрежется — лучше
+       сделать это один раз здесь и не возить лишние байты.
+
+       Окно ставим не по центру, а туда, где больше деталей: у центральной
+       обрезки персонаж, стоящий сбоку, так и остаётся сбоку, и кадр читается
+       как криво обрезанный, хотя пропорция ровная. */
     private BufferedImage toSquare(BufferedImage source) {
         int side = Math.min(source.getWidth(), source.getHeight());
+        boolean wide = source.getWidth() > source.getHeight();
+        int offset = busiestOffset(source, side, wide);
         BufferedImage cropped = source.getSubimage(
-                (source.getWidth() - side) / 2, (source.getHeight() - side) / 2, side, side);
+                wide ? offset : 0, wide ? 0 : offset, side, side);
 
         Image scaled = cropped.getScaledInstance(size, size, Image.SCALE_SMOOTH);
         BufferedImage result = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
@@ -172,6 +182,89 @@ public class AvatarServiceImpl implements AvatarService {
         graphics.drawImage(scaled, 0, 0, null);
         graphics.dispose();
         return result;
+    }
+
+    /**
+     * Смещение квадратного окна вдоль длинной стороны. Ищем полосу, где
+     * сильнее всего меняется яркость: пустое небо, стена или поле дают почти
+     * ноль, а лицо, фигура или текст — много. Это грубая замена «найди
+     * главное на фото», но на аватарках она попадает почти всегда.
+     */
+    private int busiestOffset(BufferedImage source, int side, boolean wide) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        int span = (wide ? width : height) - side;
+        if (span <= 0) {
+            return 0;
+        }
+
+        /* Считаем не по оригиналу: на 12 мегапикселях это миллионы лишних
+           операций там, где хватает картинки со стороной в пару сотен. */
+        int longSide = Math.min(ANALYSIS, wide ? width : height);
+        int shortSide = Math.max(2, side * longSide / (wide ? width : height));
+        int[][] gray = sample(source, wide ? longSide : shortSide, wide ? shortSide : longSide);
+
+        int rows = gray.length;
+        int columns = gray[0].length;
+        /* Плотность деталей по каждой полосе поперёк длинной стороны. */
+        long[] energy = new long[wide ? columns : rows];
+        for (int y = 1; y < rows; y++) {
+            for (int x = 1; x < columns; x++) {
+                long delta = Math.abs(gray[y][x] - gray[y][x - 1])
+                        + Math.abs(gray[y][x] - gray[y - 1][x]);
+                energy[wide ? x : y] += delta;
+            }
+        }
+
+        long[] prefix = new long[energy.length + 1];
+        for (int i = 0; i < energy.length; i++) {
+            prefix[i + 1] = prefix[i] + energy[i];
+        }
+
+        int window = Math.max(1, Math.min(energy.length, side * energy.length / (wide ? width : height)));
+        int limit = energy.length - window;
+        if (limit <= 0) {
+            return span / 2;
+        }
+
+        int best = limit / 2;
+        double bestScore = -1;
+        for (int start = 0; start <= limit; start++) {
+            long sum = prefix[start + window] - prefix[start];
+            /* Лёгкий перевес центру: на почти одинаковых кадрах окно иначе
+               уезжает к самому краю из-за случайного шума, а такой кадр
+               выглядит намеренно кривым. Края теряют четверть веса — этого
+               хватает на ничью и не мешает по-настоящему смещённому сюжету. */
+            double offCenter = Math.abs(start - limit / 2.0) / (limit / 2.0);
+            double score = sum * (1 - 0.25 * offCenter);
+            if (score > bestScore) {
+                bestScore = score;
+                best = start;
+            }
+        }
+
+        int offset = (int) Math.max(0, Math.min(span, (long) best * span / limit));
+        log.info("AVATAR: кадр смещён на {}% от центра",
+                Math.round((offset - span / 2.0) * 200.0 / span));
+        return offset;
+    }
+
+    /* Прореживание, а не масштабирование: считать плотность деталей можно
+       и по каждому n-му пикселю, а полноценное сглаживание тут стоило бы
+       дороже самого поиска. */
+    private int[][] sample(BufferedImage source, int columns, int rows) {
+        int[][] gray = new int[rows][columns];
+        for (int y = 0; y < rows; y++) {
+            int sourceY = (int) ((long) y * source.getHeight() / rows);
+            for (int x = 0; x < columns; x++) {
+                int sourceX = (int) ((long) x * source.getWidth() / columns);
+                int rgb = source.getRGB(sourceX, sourceY);
+                gray[y][x] = (((rgb >> 16) & 0xFF) * 299
+                        + ((rgb >> 8) & 0xFF) * 587
+                        + (rgb & 0xFF) * 114) / 1000;
+            }
+        }
+        return gray;
     }
 
     private byte[] encode(BufferedImage image) {
