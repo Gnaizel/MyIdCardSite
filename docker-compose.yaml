@@ -47,6 +47,11 @@ services:
       # адрес клиент не может.
       - TRUST_FORWARDED_FOR=true
       - FORWARD_HEADERS_STRATEGY=framework
+      # Аватарка, загруженная через бота, лежит в томе: в образе ей нельзя,
+      # он пересобирается, а вместе с ним пропало бы и фото.
+      - AVATAR_DIR=/app/data
+    volumes:
+      - avatar-data:/app/data
     networks:
       - app-network
 
@@ -85,3 +90,4 @@ volumes:
   visitor-db-data:
   caddy-data:
   caddy-config:
+  avatar-data:
