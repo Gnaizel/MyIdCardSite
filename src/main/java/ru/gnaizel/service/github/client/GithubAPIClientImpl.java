@@ -1,29 +1,21 @@
 package ru.gnaizel.service.github.client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import ru.gnaizel.dto.github.LineStatsDto;
 import ru.gnaizel.exception.GithubApiResponseException;
 import ru.gnaizel.model.github.ContributionsCollection;
-import ru.gnaizel.model.github.ContributorStats;
-import ru.gnaizel.model.github.ContributorWeek;
 import ru.gnaizel.model.github.GithubGraphQlResponse;
-import ru.gnaizel.model.github.GithubRepoRef;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -60,13 +52,62 @@ public class GithubAPIClientImpl implements GithubAPIClient {
               }
             }""";
 
-    /* Репозиториев у человека десятки, и /stats/contributors считается на
-       стороне GitHub. Больше сотни за один проход не берём: остальное всё
-       равно не попадёт в годовое окно. */
-    private static final int MAX_REPOS = 100;
+    /* Строки берём из истории коммитов, а не из /stats/contributors.
+       Тот эндпоинт GitHub считает в фоне и до готовности отвечает 202 —
+       на живом репозитории он отвечал так часами, и репозиторий просто
+       выпадал из суммы. Здесь же additions и deletions лежат в самом
+       коммите: ответ приходит сразу и всегда актуальный.
+
+       Форки пропускаем: чужая история раздула бы счётчик. */
+    private static final String LINES_QUERY = """
+            query($since: GitTimestamp!) {
+              viewer {
+                login
+                repositories(first: 100, ownerAffiliations: OWNER, isFork: false,
+                             orderBy: {field: PUSHED_AT, direction: DESC}) {
+                  nodes {
+                    nameWithOwner
+                    defaultBranchRef {
+                      target {
+                        ... on Commit {
+                          history(since: $since, first: 100) {
+                            pageInfo { hasNextPage endCursor }
+                            nodes {
+                              additions
+                              deletions
+                              author { user { login } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }""";
+
+    /* Догрузка истории одного репозитория, когда сотни коммитов не хватило. */
+    private static final String LINES_PAGE_QUERY = """
+            query($owner: String!, $name: String!, $since: GitTimestamp!, $after: String!) {
+              repository(owner: $owner, name: $name) {
+                defaultBranchRef {
+                  target {
+                    ... on Commit {
+                      history(since: $since, first: 100, after: $after) {
+                        pageInfo { hasNextPage endCursor }
+                        nodes {
+                          additions
+                          deletions
+                          author { user { login } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }""";
 
     private final RestTemplate template = new RestTemplate();
-    private final ObjectMapper json = new ObjectMapper();
 
     @Value("${github.api-token}")
     private String token;
@@ -98,91 +139,63 @@ public class GithubAPIClientImpl implements GithubAPIClient {
 
     @Override
     public LineStatsDto getLineStats() {
-        List<GithubRepoRef> repos = listRepos();
-        if (repos.isEmpty()) {
-            return new LineStatsDto(0, 0, false, false);
+        String since = Instant.now().minus(365, ChronoUnit.DAYS).toString();
+        JsonNode viewer = graphQl(LINES_QUERY, Map.of("since", since)).path("viewer");
+        String me = viewer.path("login").asText();
+
+        long[] totals = new long[3];
+        for (JsonNode repo : viewer.path("repositories").path("nodes")) {
+            JsonNode history = repo.path("defaultBranchRef").path("target").path("history");
+            boolean more = sumHistory(history, me, totals);
+
+            /* Сотня коммитов за год в одном репозитории — редкость, но если
+               она случилась, дочитываем остальное постранично: иначе разница
+               молча потерялась бы, а именно из-за таких потерь этот счётчик
+               и переписывался. */
+            String cursor = history.path("pageInfo").path("endCursor").asText(null);
+            String[] parts = repo.path("nameWithOwner").asText().split("/", 2);
+            while (more && cursor != null && parts.length == 2) {
+                JsonNode page = graphQl(LINES_PAGE_QUERY, Map.of(
+                                "owner", parts[0], "name", parts[1], "since", since, "after", cursor))
+                        .path("repository").path("defaultBranchRef").path("target").path("history");
+                more = sumHistory(page, me, totals);
+                cursor = page.path("pageInfo").path("endCursor").asText(null);
+            }
         }
 
-        long since = Instant.now().minus(365, ChronoUnit.DAYS).getEpochSecond();
-        long added = 0;
-        long removed = 0;
-        boolean any = false;
-        boolean pending = false;
+        return new LineStatsDto(totals[0], totals[1], totals[2] > 0);
+    }
 
-        for (GithubRepoRef repo : repos) {
-            if (repo.isFork() || repo.getFullName() == null) {
+    /* Складываем только свои коммиты: в истории лежат и чужие, если в репозиторий
+       кто-то присылал изменения. Возвращаем признак того, что страница не последняя. */
+    private boolean sumHistory(JsonNode history, String me, long[] totals) {
+        for (JsonNode commit : history.path("nodes")) {
+            if (!me.equalsIgnoreCase(commit.path("author").path("user").path("login").asText())) {
                 continue;
             }
-            Stats stats = contributorStats(repo.getFullName());
-            pending |= stats.pending();
-            for (ContributorStats stat : stats.contributors()) {
-                if (stat.getAuthor() == null || !login.equalsIgnoreCase(stat.getAuthor().getLogin())) {
-                    continue;
-                }
-                if (stat.getWeeks() == null) {
-                    continue;
-                }
-                for (ContributorWeek week : stat.getWeeks()) {
-                    if (week.getW() >= since) {
-                        added += week.getA();
-                        removed += week.getD();
-                        any = true;
-                    }
-                }
-            }
+            totals[0] += commit.path("additions").asLong();
+            totals[1] += commit.path("deletions").asLong();
+            totals[2] = 1;
         }
-
-        return new LineStatsDto(added, removed, any, pending);
+        return history.path("pageInfo").path("hasNextPage").asBoolean();
     }
 
-    /* Три исхода вместо двух: есть данные, GitHub ещё считает, запрос не удался.
-       Раньше последние два были неразличимы, и «ещё считает» оседало в кэше
-       на сутки как готовый ответ. */
-    private record Stats(List<ContributorStats> contributors, boolean pending) {
-        static Stats none() {
-            return new Stats(List.of(), false);
-        }
-
-        static Stats notReady() {
-            return new Stats(List.of(), true);
-        }
-    }
-
-    private List<GithubRepoRef> listRepos() {
-        String url = REST_URL + "/user/repos?per_page=" + MAX_REPOS
-                + "&affiliation=owner&sort=pushed";
+    /* Ответ разбираем в JsonNode, а не в модели: из этого запроса нужны четыре
+       поля, а типизировать пришлось бы всю вложенность из шести уровней. */
+    private JsonNode graphQl(String query, Map<String, Object> variables) {
+        HttpEntity<Map<String, Object>> request =
+                new HttpEntity<>(Map.of("query", query, "variables", variables), headers());
+        JsonNode response;
         try {
-            GithubRepoRef[] repos = template.exchange(url, HttpMethod.GET,
-                    new HttpEntity<>(headers()), GithubRepoRef[].class).getBody();
-            return repos == null ? List.of() : Arrays.asList(repos);
+            response = template.postForObject(GRAPHQL_URL, request, JsonNode.class);
         } catch (RestClientException e) {
-            log.error("GITHUB API ERROR (repos): " + e.getMessage());
-            return List.of();
+            throw new GithubApiResponseException("GITHUB API ERROR: " + e.getMessage());
         }
-    }
-
-    /* Ответ берём строкой и разбираем сами: на 202 GitHub отдаёт не массив,
-       а пустой объект, и разбор сразу в ContributorStats[] падал на нём
-       исключением. Со стороны это выглядело как сбой, хотя на деле GitHub
-       просто ещё не досчитал — и репозиторий молча выпадал из суммы. */
-    private Stats contributorStats(String fullName) {
-        String url = REST_URL + "/repos/" + fullName + "/stats/contributors";
-        try {
-            ResponseEntity<String> response = template.exchange(url, HttpMethod.GET,
-                    new HttpEntity<>(headers()), String.class);
-            if (response.getStatusCode() == HttpStatus.ACCEPTED) {
-                log.info("GITHUB: статистика по {} ещё считается на их стороне", fullName);
-                return Stats.notReady();
-            }
-            String body = response.getBody();
-            if (body == null || body.isBlank() || !body.trim().startsWith("[")) {
-                return Stats.notReady();
-            }
-            return new Stats(Arrays.asList(json.readValue(body, ContributorStats[].class)), false);
-        } catch (RestClientException | JsonProcessingException e) {
-            log.warn("GITHUB API WARN (stats {}): {}", fullName, e.getMessage());
-            return Stats.none();
+        if (response == null || response.has("errors")) {
+            throw new GithubApiResponseException("GITHUB API ERROR: "
+                    + (response == null ? "empty response" : response.path("errors").toString()));
         }
+        return response.path("data");
     }
 
     private HttpHeaders headers() {

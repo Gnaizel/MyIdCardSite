@@ -12,8 +12,4 @@ public class LineStatsDto {
     private long added;
     private long removed;
     private boolean available;
-
-    /* По части репозиториев GitHub на момент запроса ещё считал статистику,
-       и они в сумму не попали. Значит, кэшировать это надолго нельзя. */
-    private boolean pending;
 }
