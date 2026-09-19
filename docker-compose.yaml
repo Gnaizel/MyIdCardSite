@@ -68,8 +68,12 @@ services:
       # Оба значения берутся из .env. Дефолт localhost — чтобы случайный
       # docker compose up на ноутбуке не ломился в Let's Encrypt за
       # сертификатом: для localhost Caddy выпишет свой, локальный.
-      # На сервере SITE_DOMAIN и ACME_EMAIL обязаны быть заданы.
-      - SITE_DOMAIN=${SITE_DOMAIN:-localhost}
+      # На сервере SITE_DOMAINS и ACME_EMAIL обязаны быть заданы.
+      #
+      # Имён может быть сколько угодно, через запятую — Caddy берёт
+      # сертификат на каждое отдельно. SITE_DOMAIN в единственном числе
+      # читается запасным, чтобы старый .env не перестал работать.
+      - SITE_DOMAINS=${SITE_DOMAINS:-${SITE_DOMAIN:-localhost}}
       - ACME_EMAIL=${ACME_EMAIL:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

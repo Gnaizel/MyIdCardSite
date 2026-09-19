@@ -1,6 +1,6 @@
-# Caddy сам получает сертификат Let's Encrypt, сам его продлевает и сам
-# редиректит http -> https. Никакого certbot и cron не нужно.
-# Домен и почта берутся из .env (SITE_DOMAIN, ACME_EMAIL).
+# Caddy сам получает сертификат Let's Encrypt на каждое имя, сам их
+# продлевает и сам редиректит http -> https. Никакого certbot и cron.
+# Список имён и почта берутся из .env (SITE_DOMAINS, ACME_EMAIL).
 {
 	# Почта, на которую Let's Encrypt напишет, если продление сломается.
 	# Кавычки обязательны: без них пустой ACME_EMAIL разворачивается в
@@ -10,8 +10,10 @@
 	email "{$ACME_EMAIL}"
 }
 
-{$SITE_DOMAIN} {
-	# Весь http-трафик на этот домен Caddy редиректит на https сам, 308-м.
+# Все имена одним блоком, через запятую. Сертификат Caddy возьмёт на каждое
+# отдельно, так что домены можно добавлять и убирать по одному.
+{$SITE_DOMAINS} {
+	# Весь http-трафик на эти имена Caddy редиректит на https сам, 308-м.
 
 	encode zstd gzip
 
@@ -27,6 +29,14 @@
 		-Server
 	}
 
+	# www уводим на апекс тем же блоком, а не отдельным: отдельный пришлось
+	# бы вести списком руками, и он ломался бы, стоило завести домен без
+	# www-записи. labels нумеруются справа, поэтому для www.sponj.online
+	# labels.1 = sponj, labels.0 = online — правило работает с любым
+	# доменом из списка, ничего не зная про него заранее.
+	@www expression {host}.startsWith("www.")
+	redir @www https://{labels.1}.{labels.0}{uri} permanent
+
 	# Actuator приезжает вместе со spring-boot-starter-actuator и наружу не нужен.
 	@internal path /actuator /actuator/*
 	respond @internal 404
@@ -37,10 +47,4 @@
 	# Ломается это только если задать глобальный trusted_proxies: тогда
 	# заголовку клиента начнут верить.
 	reverse_proxy my-site:8080
-}
-
-# www -> апекс. Если A-записи для www нет, удали этот блок целиком:
-# иначе Caddy будет впустую ломиться за сертификатом, которого не выдадут.
-www.{$SITE_DOMAIN} {
-	redir https://{$SITE_DOMAIN}{uri} permanent
 }
