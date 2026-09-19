@@ -196,9 +196,6 @@ acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 **Браузер держит http и не пускает на https** — это HSTS с прошлого раза.
 Сбрасывается в `chrome://net-internals/#hsts`.
 
-**Приложение не стартует, в логах `NumberFormatException`** — в `.env`
-пустой `STEAM_ID`. Поставить `0`.
-
 ---
 
 ## Безопасность

@@ -23,7 +23,7 @@ copy .env.example .env    # один раз, потом впиши ключи
 |---|---|---|
 | `LASTFM_API_TOKEN` | музыка: `/tracks`, `/rotation` | [last.fm/api/account/create](https://www.last.fm/api/account/create) |
 | `STEAM_API_TOKEN` | игры: `/games`, `/games-total-hours` | [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey) |
-| `STEAM_ID` | тот же блок игр | [steamid.io](https://steamid.io) — нужен SteamID64 |
+| `STEAM_IDS` | тот же блок игр, можно несколько аккаунтов | [steamid.io](https://steamid.io) — нужен SteamID64 |
 | `GITHUB_TOKEN` | календарь коммитов: `/github` | [github.com/settings/tokens](https://github.com/settings/tokens) |
 | `GUESTBOOK_ADMIN_KEY` | модерация гостевой книги | придумай сам |
 | `TELEGRAM_BOT_TOKEN` | бот шлёт в телеграм всё, что пишут в книгу | [@BotFather](https://t.me/BotFather) |
@@ -39,9 +39,21 @@ copy .env.example .env    # один раз, потом впиши ключи
 Страница ключа попросит указать домен — впиши `localhost`, для личного
 использования этого хватает. Ключ выдаётся сразу.
 
-`STEAM_ID` — это не ник, а число из 17 цифр. Вставь на steamid.io ссылку
+`STEAM_IDS` — это не ники, а числа из 17 цифр. Вставь на steamid.io ссылку
 на свой профиль и возьми поле **steamID64**. Профиль и раздел «Игры» должны
 быть публичными, иначе Steam отдаст пустой список даже с верным ключом.
+
+Аккаунтов можно перечислить сколько угодно через запятую:
+
+```
+STEAM_IDS=76561198000000001,76561198000000002
+```
+
+Часы складываются, библиотеки сшиваются по игре: одна и та же игра на двух
+аккаунтах даст сумму часов, а не два пункта в списке. Ключ нужен один — он
+выдаётся разработчику, а не профилю, и работает с любым публичным профилем.
+Аккаунт с закрытым профилем просто не попадёт в сумму, в логе будет строка
+`STEAM: аккаунт ... не отдал ничего`.
 
 ### GitHub
 
@@ -86,9 +98,6 @@ https://api.telegram.org/bot<ТОКЕН>/getUpdates
 
 **База сбойнула** — пересоздать с нуля:
 `docker compose down -v; docker compose up -d visitor-db`.
-
-**Приложение не стартует с `NumberFormatException`** — в `.env` пустой
-`STEAM_ID`. Поставь `0`, если своего пока нет.
 
 ## Прод
 
