@@ -1,10 +1,13 @@
 package ru.gnaizel.service.github.client;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -63,6 +66,7 @@ public class GithubAPIClientImpl implements GithubAPIClient {
     private static final int MAX_REPOS = 100;
 
     private final RestTemplate template = new RestTemplate();
+    private final ObjectMapper json = new ObjectMapper();
 
     @Value("${github.api-token}")
     private String token;
@@ -96,23 +100,22 @@ public class GithubAPIClientImpl implements GithubAPIClient {
     public LineStatsDto getLineStats() {
         List<GithubRepoRef> repos = listRepos();
         if (repos.isEmpty()) {
-            return new LineStatsDto(0, 0, false);
+            return new LineStatsDto(0, 0, false, false);
         }
 
         long since = Instant.now().minus(365, ChronoUnit.DAYS).getEpochSecond();
         long added = 0;
         long removed = 0;
         boolean any = false;
+        boolean pending = false;
 
         for (GithubRepoRef repo : repos) {
             if (repo.isFork() || repo.getFullName() == null) {
                 continue;
             }
-            List<ContributorStats> stats = contributorStats(repo.getFullName());
-            if (stats == null) {
-                continue;  // 202: GitHub ещё считает — возьмём в следующий раз
-            }
-            for (ContributorStats stat : stats) {
+            Stats stats = contributorStats(repo.getFullName());
+            pending |= stats.pending();
+            for (ContributorStats stat : stats.contributors()) {
                 if (stat.getAuthor() == null || !login.equalsIgnoreCase(stat.getAuthor().getLogin())) {
                     continue;
                 }
@@ -129,7 +132,20 @@ public class GithubAPIClientImpl implements GithubAPIClient {
             }
         }
 
-        return new LineStatsDto(added, removed, any);
+        return new LineStatsDto(added, removed, any, pending);
+    }
+
+    /* Три исхода вместо двух: есть данные, GitHub ещё считает, запрос не удался.
+       Раньше последние два были неразличимы, и «ещё считает» оседало в кэше
+       на сутки как готовый ответ. */
+    private record Stats(List<ContributorStats> contributors, boolean pending) {
+        static Stats none() {
+            return new Stats(List.of(), false);
+        }
+
+        static Stats notReady() {
+            return new Stats(List.of(), true);
+        }
     }
 
     private List<GithubRepoRef> listRepos() {
@@ -145,16 +161,27 @@ public class GithubAPIClientImpl implements GithubAPIClient {
         }
     }
 
-    private List<ContributorStats> contributorStats(String fullName) {
+    /* Ответ берём строкой и разбираем сами: на 202 GitHub отдаёт не массив,
+       а пустой объект, и разбор сразу в ContributorStats[] падал на нём
+       исключением. Со стороны это выглядело как сбой, хотя на деле GitHub
+       просто ещё не досчитал — и репозиторий молча выпадал из суммы. */
+    private Stats contributorStats(String fullName) {
         String url = REST_URL + "/repos/" + fullName + "/stats/contributors";
         try {
-            ResponseEntity<ContributorStats[]> response = template.exchange(url, HttpMethod.GET,
-                    new HttpEntity<>(headers()), ContributorStats[].class);
-            ContributorStats[] body = response.getBody();
-            return body == null ? null : Arrays.asList(body);
-        } catch (RestClientException e) {
-            log.warn("GITHUB API WARN (stats): " + e.getMessage());
-            return null;
+            ResponseEntity<String> response = template.exchange(url, HttpMethod.GET,
+                    new HttpEntity<>(headers()), String.class);
+            if (response.getStatusCode() == HttpStatus.ACCEPTED) {
+                log.info("GITHUB: статистика по {} ещё считается на их стороне", fullName);
+                return Stats.notReady();
+            }
+            String body = response.getBody();
+            if (body == null || body.isBlank() || !body.trim().startsWith("[")) {
+                return Stats.notReady();
+            }
+            return new Stats(Arrays.asList(json.readValue(body, ContributorStats[].class)), false);
+        } catch (RestClientException | JsonProcessingException e) {
+            log.warn("GITHUB API WARN (stats {}): {}", fullName, e.getMessage());
+            return Stats.none();
         }
     }
 

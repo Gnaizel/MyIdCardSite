@@ -15,7 +15,9 @@ import java.time.Instant;
  * Кеш здесь обязателен, а не для красоты: фронт дёргает /github вместе с
  * остальными эндпоинтами, а подсчёт строк — это запрос на каждый репозиторий.
  * Календарь живёт 15 минут, строки — сутки (GitHub всё равно пересчитывает
- * /stats/contributors примерно раз в день).
+ * /stats/contributors примерно раз в день). Но только если ответ пришёл
+ * полным: пока GitHub досчитывает статистику по свежему пушу, он отдаёт 202,
+ * такие репозитории в сумму не попадают, и держать её сутки нельзя.
  */
 @Slf4j
 @Service
@@ -24,14 +26,23 @@ public class GithubServiceImpl implements GithubService {
     private static final Duration ACTIVITY_TTL = Duration.ofMinutes(15);
     private static final Duration LINES_TTL = Duration.ofHours(24);
 
+    /* Если GitHub по части репозиториев ещё считал статистику, сумма вышла
+       неполной, и держать её сутки нельзя: число на карточке замерзало бы
+       на день после каждого пуша. Через десять минут спросим снова. */
+    private static final Duration PENDING_TTL = Duration.ofMinutes(10);
+
     private final GithubAPIClient client;
     private final GithubMapper mapper;
 
     private volatile GithubActivityDto cachedActivity;
     private volatile Instant activityAt;
 
-    private volatile LineStatsDto cachedLines = new LineStatsDto(0, 0, false);
+    private volatile LineStatsDto cachedLines = new LineStatsDto(0, 0, false, false);
     private volatile Instant linesAt;
+
+    /* Отдельно от cachedLines: неполный ответ мы в кэш не кладём, но помнить
+       о нём надо — иначе следующая попытка отложилась бы опять на сутки. */
+    private volatile boolean linesPending;
 
     @Override
     public GithubActivityDto getActivity() {
@@ -46,11 +57,18 @@ public class GithubServiceImpl implements GithubService {
     }
 
     private LineStatsDto lines() {
-        if (fresh(linesAt, LINES_TTL)) {
+        if (fresh(linesAt, linesPending ? PENDING_TTL : LINES_TTL)) {
             return cachedLines;
         }
         try {
-            cachedLines = client.getLineStats();
+            LineStatsDto fetched = client.getLineStats();
+            linesPending = fetched.isPending();
+            /* Неполной суммой полную не затираем: иначе число на карточке
+               проседало бы каждый раз, когда GitHub берётся пересчитывать
+               статистику по свежему пушу. */
+            if (!fetched.isPending() || !cachedLines.isAvailable()) {
+                cachedLines = fetched;
+            }
         } catch (RuntimeException e) {
             // строки — не главное: отдадим календарь без них, чем ничего
             log.error("GITHUB LINES ERROR: " + e.getMessage());
