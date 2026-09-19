@@ -2,9 +2,7 @@ package ru.gnaizel.mapper.game;
 
 import lombok.extern.slf4j.Slf4j;
 import ru.gnaizel.dto.games.GOGSteamResponseDto;
-import ru.gnaizel.dto.games.GRPGSteamResponseDto;
 import ru.gnaizel.dto.games.GameDto;
-import ru.gnaizel.exception.GameMappingDtoError;
 import ru.gnaizel.model.games.Game;
 
 import java.time.Instant;
@@ -54,31 +52,26 @@ public class GameMapper {
         return hours + "h " + remMinutes + "m";
     }
 
-    public static Game GRPGDtoAndGOGDtoToGame(GRPGSteamResponseDto GRPG, GOGSteamResponseDto GOG) {
-        int appid = GRPG.getAppid();
+    public static Game gogDtoToGame(GOGSteamResponseDto gog) {
+        int appid = gog.getAppid();
 
-        if (appid != GOG.getAppid()) {
-            throw new GameMappingDtoError("Id's GRPG and GOG don't match");
-        }
-
-        Instant lastPlayedInstant = Instant.ofEpochSecond(GOG.getRtime_last_played());
+        Instant lastPlayedInstant = Instant.ofEpochSecond(gog.getRtime_last_played());
         LocalDateTime lastPlayed = LocalDateTime.ofInstant(lastPlayedInstant, ZoneId.of("UTC+4"));
-
 
         Game game = new Game();
         game.setAppid(appid);
-        game.setPlaytime_2weeks(GRPG.getPlaytime_2weeks());
-        game.setPlaytime_forever(GRPG.getPlaytime_forever());
-        game.setPlaytime_windows_forever(GRPG.getPlaytime_windows_forever());
-        game.setName(GRPG.getName());
+        game.setPlaytime_2weeks(gog.getPlaytime_2weeks());
+        game.setPlaytime_forever(gog.getPlaytime_forever());
+        game.setPlaytime_windows_forever(gog.getPlaytime_windows_forever());
+        game.setName(gog.getName());
         game.setBanner_url("https://cdn.akamai.steamstatic.com/steam/apps/" +
                 appid + "/" +
                 "header.jpg");
         game.setImg_icon_url("https://media.steampowered.com/steamcommunity/public/images/apps/" +
                 appid + "/" +
-                GRPG.getImg_icon_url() + ".jpg");
+                gog.getImg_icon_url() + ".jpg");
         game.setRtime_last_played(lastPlayed);
-        game.setPlaytime_disconnected(GOG.getPlaytime_disconnected());
+        game.setPlaytime_disconnected(gog.getPlaytime_disconnected());
         return game;
     }
 }

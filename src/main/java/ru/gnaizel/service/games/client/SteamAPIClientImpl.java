@@ -6,9 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import ru.gnaizel.dto.games.GOGSteamResponseDto;
-import ru.gnaizel.dto.games.GRPGSteamResponseDto;
 import ru.gnaizel.dto.games.SteamOwnedGamesResponse;
-import ru.gnaizel.dto.games.SteamRecentGamesResponse;
 import ru.gnaizel.exception.SteamApiResponseException;
 
 import java.util.Arrays;
@@ -21,19 +19,19 @@ import java.util.Map;
  * профилю, и одним ключом опрашивается любой публичный профиль. Библиотеки
  * складываются по appid — одна и та же игра на двух аккаунтах даёт сумму
  * часов, а не два отдельных пункта.
+ * <p>
+ * Запрос ровно один на аккаунт: GetOwnedGames отдаёт и часы, и название,
+ * и время последнего запуска.
  */
 @Slf4j
 @Service
 public class SteamAPIClientImpl implements SteamAPIClient {
-    private static final String RECENT_URL =
-            "https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/"
-                    + "?key=%s&steamid=%s&format=json";
-
-    /* include_played_free_games обязателен: без него Steam не отдаёт free-to-play
-       игры, и недавно сыгранная F2P не находится в библиотеке при сшивке. */
+    /* include_played_free_games — иначе Steam молчит про free-to-play, а в них
+       как раз и играют. include_appinfo — иначе не приходят название и иконка,
+       и игру нечем показать. */
     private static final String OWNED_URL =
             "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
-                    + "?key=%s&steamid=%s&include_played_free_games=1&format=json";
+                    + "?key=%s&steamid=%s&include_played_free_games=1&include_appinfo=1&format=json";
 
     private final RestTemplate template = new RestTemplate();
 
@@ -42,20 +40,6 @@ public class SteamAPIClientImpl implements SteamAPIClient {
 
     @Value("${steam.ids:}")
     private String ids;
-
-    @Override
-    public List<GRPGSteamResponseDto> getLastActivity() {
-        Map<Integer, GRPGSteamResponseDto> merged = new LinkedHashMap<>();
-        for (String id : steamIds()) {
-            for (GRPGSteamResponseDto game : recent(id)) {
-                merged.merge(game.getAppid(), game, SteamAPIClientImpl::combineRecent);
-            }
-        }
-        if (merged.isEmpty()) {
-            throw new SteamApiResponseException("STEAM API ERROR: array is null");
-        }
-        return List.copyOf(merged.values());
-    }
 
     @Override
     public List<GOGSteamResponseDto> getAllGameLib() {
@@ -82,18 +66,6 @@ public class SteamAPIClientImpl implements SteamAPIClient {
 
     /* Ошибка одного аккаунта не должна ронять остальные: профиль могли закрыть,
        id — опечатать. Такой просто не попадает в сумму, о чём есть строка в логе. */
-    private List<GRPGSteamResponseDto> recent(String id) {
-        try {
-            SteamRecentGamesResponse response =
-                    template.getForObject(RECENT_URL.formatted(token, id), SteamRecentGamesResponse.class);
-            return games(response == null || response.getResponse() == null
-                    ? null : response.getResponse().getGames(), id, "недавние");
-        } catch (RestClientException e) {
-            log.error("STEAM API ERROR (аккаунт {}): {}", id, e.getMessage());
-            return List.of();
-        }
-    }
-
     private List<GOGSteamResponseDto> owned(String id) {
         try {
             SteamOwnedGamesResponse response =
@@ -106,23 +78,15 @@ public class SteamAPIClientImpl implements SteamAPIClient {
         }
     }
 
-    /* Пустой response приходит и у закрытого профиля, и когда за две недели
-       не играли. Отличить одно от другого Steam не даёт, поэтому просто
-       говорим, что аккаунт ничего не дал. */
+    /* Пустой response приходит и у закрытого профиля, и у аккаунта без игр.
+       Отличить одно от другого Steam не даёт, поэтому просто говорим,
+       что аккаунт ничего не дал. */
     private <T> List<T> games(List<T> games, String id, String what) {
         if (games == null || games.isEmpty()) {
             log.info("STEAM: аккаунт {} не отдал ничего ({}) — закрытый профиль или пусто", id, what);
             return List.of();
         }
         return games;
-    }
-
-    private static GRPGSteamResponseDto combineRecent(GRPGSteamResponseDto first, GRPGSteamResponseDto second) {
-        first.setPlaytime_2weeks(first.getPlaytime_2weeks() + second.getPlaytime_2weeks());
-        first.setPlaytime_forever(first.getPlaytime_forever() + second.getPlaytime_forever());
-        first.setPlaytime_windows_forever(
-                first.getPlaytime_windows_forever() + second.getPlaytime_windows_forever());
-        return first;
     }
 
     private static GOGSteamResponseDto combineOwned(GOGSteamResponseDto first, GOGSteamResponseDto second) {
@@ -136,6 +100,12 @@ public class SteamAPIClientImpl implements SteamAPIClient {
            поздний из аккаунтов, иначе игра уехала бы в конец списка недавних. */
         first.setRtime_last_played(
                 Math.max(first.getRtime_last_played(), second.getRtime_last_played()));
+        /* Название и иконка у игры одни и те же на любом аккаунте, но прийти
+           могут не от каждого — берём первое непустое. */
+        if (first.getName() == null || first.getName().isBlank()) {
+            first.setName(second.getName());
+            first.setImg_icon_url(second.getImg_icon_url());
+        }
         return first;
     }
 }
