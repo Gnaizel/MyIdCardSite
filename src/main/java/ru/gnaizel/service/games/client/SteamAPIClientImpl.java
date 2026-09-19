@@ -3,6 +3,7 @@ package ru.gnaizel.service.games.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +67,10 @@ public class SteamAPIClientImpl implements SteamAPIClient {
     private static final long PAUSE_MS = 500;
 
     private final RestTemplate template = new RestTemplate();
-    private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper json = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            /* Иначе время пишется числом секунд и файл нельзя прочитать глазами. */
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     /* Последний удачный ответ по каждому аккаунту и время, до которого его
        не стоит беспокоить. */
@@ -107,7 +111,12 @@ public class SteamAPIClientImpl implements SteamAPIClient {
                 continue;
             }
             for (GOGSteamResponseDto game : snapshot.games()) {
-                merged.merge(game.getAppid(), game, SteamAPIClientImpl::combineOwned);
+                /* Копия, а не сам объект: combineOwned складывает часы в первый
+                   аргумент, а объекты из snapshot живут в памяти между
+                   запросами и уходят на диск. Без копии каждое слияние
+                   дописывало бы чужие часы в сохранённые данные аккаунта,
+                   и сумма росла бы сама по себе с каждым обновлением. */
+                merged.merge(game.getAppid(), copyOf(game), SteamAPIClientImpl::combineOwned);
             }
         }
 
@@ -231,6 +240,19 @@ public class SteamAPIClientImpl implements SteamAPIClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private static GOGSteamResponseDto copyOf(GOGSteamResponseDto source) {
+        GOGSteamResponseDto copy = new GOGSteamResponseDto();
+        copy.setAppid(source.getAppid());
+        copy.setPlaytime_2weeks(source.getPlaytime_2weeks());
+        copy.setPlaytime_forever(source.getPlaytime_forever());
+        copy.setPlaytime_windows_forever(source.getPlaytime_windows_forever());
+        copy.setPlaytime_disconnected(source.getPlaytime_disconnected());
+        copy.setRtime_last_played(source.getRtime_last_played());
+        copy.setName(source.getName());
+        copy.setImg_icon_url(source.getImg_icon_url());
+        return copy;
     }
 
     private static GOGSteamResponseDto combineOwned(GOGSteamResponseDto first, GOGSteamResponseDto second) {
