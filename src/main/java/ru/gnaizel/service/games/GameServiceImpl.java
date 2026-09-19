@@ -30,6 +30,11 @@ public class GameServiceImpl implements GameService {
        чем открывается страница. */
     private static final Duration TTL = Duration.ofMinutes(15);
 
+    /* Если часть аккаунтов не ответила, сумма занижена. Держать такую
+       четверть часа нельзя: счётчик часов молча просядет и застынет.
+       Через минуту спросим снова — лимит частоты к тому времени отпустит. */
+    private static final Duration PARTIAL_TTL = Duration.ofMinutes(1);
+
     private final SteamAPIClient steamAPIClient;
     private final FortniteAPIClient fortniteAPIClient;
 
@@ -101,25 +106,38 @@ public class GameServiceImpl implements GameService {
 
     private Library library() {
         Library current = cached;
+        Duration ttl = current != null && current.complete() ? TTL : PARTIAL_TTL;
         if (current != null && cachedAt != null
-                && Duration.between(cachedAt, Instant.now()).compareTo(TTL) < 0) {
+                && Duration.between(cachedAt, Instant.now()).compareTo(ttl) < 0) {
             return current;
         }
 
         List<GOGSteamResponseDto> steam = List.of();
+        boolean complete = false;
         try {
-            steam = steamAPIClient.getAllGameLib();
+            SteamAPIClient.Library answer = steamAPIClient.getAllGameLib();
+            steam = answer.games();
+            complete = answer.complete();
         } catch (RuntimeException e) {
             /* Steam мог не ответить, но Fortnite при этом жив — отдадим хоть
                что-то, вместо того чтобы обнулить весь блок. */
             log.error("GAMES: steam не ответил: {}", e.getMessage());
         }
 
-        Library fresh = new Library(steam, fortniteAPIClient.getStats());
+        Library fresh = new Library(steam, fortniteAPIClient.getStats(), complete);
         if (steam.isEmpty() && fresh.fortnite().isEmpty()) {
             /* Пустой результат не кэшируем: иначе одна неудачная минута
                оставила бы блок пустым на следующие пятнадцать. */
             return current == null ? fresh : current;
+        }
+
+        /* Неполной библиотекой полную не затираем: часть аккаунтов могла
+           упереться в лимит частоты, и сумма часов просела бы на глазах.
+           Показываем прежнюю, правильную, и скоро попробуем снова. */
+        if (!complete && current != null && current.complete()) {
+            log.warn("GAMES: ответили не все аккаунты, оставляю прежнюю библиотеку");
+            cachedAt = Instant.now();
+            return current;
         }
 
         cached = fresh;
@@ -127,6 +145,7 @@ public class GameServiceImpl implements GameService {
         return fresh;
     }
 
-    private record Library(List<GOGSteamResponseDto> steam, Optional<FortniteStatsDto> fortnite) {
+    private record Library(List<GOGSteamResponseDto> steam, Optional<FortniteStatsDto> fortnite,
+                           boolean complete) {
     }
 }
