@@ -1,19 +1,55 @@
+# Все секреты берутся из переменных окружения: в репозитории их нет и быть не должно.
+# Локальный запуск перекрывает часть этих значений через application-local.yaml.
 server:
-  port: 443
+  port: ${SERVER_PORT:8080}
+  # Позади прокси (docker-compose ставит впереди Caddy) приложение само
+  # остаётся на http, но должно понимать, что снаружи клиент пришёл по https:
+  # иначе любой редирект уведёт его на http. Значение выставляет compose;
+  # по умолчанию none, потому что без прокси заголовкам верить нельзя.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
   ssl:
-    key-alias: tomcat
+    # Сертификат отдаёт Caddy, приложению он не нужен — см. README-DEPLOY.md.
+    # Блок оставлен на случай, если захочется отдать https самим Spring:
+    # тогда SSL_ENABLED=true и свой .p12 рядом с jar.
+    enabled: ${SSL_ENABLED:false}
+    key-alias: ${SSL_KEY_ALIAS:tomcat}
     key-store-type: PKCS12
-    key-store: classpath:javabegin_ssl.p12
-    key-store-password: root
+    key-store: ${SSL_KEYSTORE:file:./keystore.p12}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD:}
   http2:
-    enabled: true
+    enabled: ${HTTP2_ENABLED:false}
 
 last.fm:
-  api-token: "key"
+  api-token: ${LASTFM_API_TOKEN:}
 
 steam:
-  id: "id"
-  api-token: "key"
+  # SteamID64 — число, поэтому дефолт 0, а не пустая строка.
+  id: ${STEAM_ID:0}
+  api-token: ${STEAM_API_TOKEN:}
+
+guestbook:
+  # Пока ключ пустой, админские ручки закрыты наглухо и отвечают 401.
+  # Любая длинная случайная строка, передаётся заголовком X-Admin-Key.
+  admin-key: ${GUESTBOOK_ADMIN_KEY:}
+  # Включать, только если перед приложением реально стоит прокси: иначе
+  # заголовком X-Forwarded-For можно подделать адрес и обойти лимиты.
+  trust-forwarded-for: ${TRUST_FORWARDED_FOR:false}
+
+telegram:
+  # Токен бота от @BotFather. Пустой — уведомления просто не уходят,
+  # сообщения всё так же копятся в базе и видны через GET /guestbook/all.
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
+  # Куда слать. Свой id бот узнает сам: напиши ему что угодно и загляни
+  # в https://api.telegram.org/bot<ТОКЕН>/getUpdates — там result[0].message.chat.id
+  chat-id: ${TELEGRAM_CHAT_ID:}
+  # Часовой пояс в подписи под сообщением.
+  zone: ${TELEGRAM_ZONE:UTC+4}
+
+github:
+  login: ${GITHUB_LOGIN:Gnaizel}
+  # PAT с правом read:user — нужен, чтобы в календарь попадали приватные репо.
+  # Наружу по /github уходят только числа: ни имён репозиториев, ни коммитов.
+  api-token: ${GITHUB_TOKEN:}
 
 logging:
   level:
@@ -22,10 +58,9 @@ logging:
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    username: username
-    password: pass
-#    url: jdbc:postgresql://localhost:2346/visitor-db
-    url:  jdbc:postgresql://visitor-db:5432/visitor-db
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://visitor-db:5432/visitor-db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
   jpa:
     hibernate:
       ddl-auto: update
