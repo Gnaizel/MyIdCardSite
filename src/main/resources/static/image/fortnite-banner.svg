@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" width="1280" height="360">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#18281d"/>
+      <stop offset="1" stop-color="#0d130f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="360" fill="url(#bg)"/>
+  <!-- Глиф сдвинут вправо: слева поверх баннера ложатся название игры
+       и счётчики, по центру он оказался бы прямо под текстом.
+       Прозрачность высокая, потому что сверху CSS ещё притушит до .55. -->
+  <g transform="translate(980 36) scale(12)" fill="#46c07a" opacity="0.55">
+    <path d="m15.767 14.171.097-5.05H12.4V5.197h3.99L16.872 0H7.128v24l5.271-.985V14.17z"/>
+  </g>
+</svg>

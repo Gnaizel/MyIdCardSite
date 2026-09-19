@@ -46,10 +46,10 @@ fortnite:
   name: ${FORTNITE_NAME:}
   account-type: ${FORTNITE_ACCOUNT_TYPE:epic}
   # Как подписать игру и чем её проиллюстрировать: в Steam картинки берутся
-  # по appid, а у Fortnite его нет.
+  # по appid, а у Fortnite его нет, поэтому лежат в static своими файлами.
   title: ${FORTNITE_TITLE:Fortnite}
-  icon: ${FORTNITE_ICON:/image/game-icon.jpg}
-  banner: ${FORTNITE_BANNER:/image/game-icon.jpg}
+  icon: ${FORTNITE_ICON:/image/fortnite.svg}
+  banner: ${FORTNITE_BANNER:/image/fortnite-banner.svg}
 
 guestbook:
   # Пока ключ пустой, админские ручки закрыты наглухо и отвечают 401.
