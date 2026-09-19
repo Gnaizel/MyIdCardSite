@@ -678,6 +678,9 @@ h2.playtime .num { color: var(--text); }
     scrollbar-color: var(--line) transparent;
 }
 
+/* Плитка — кнопка: по клику её статистика уезжает в крупный блок слева.
+   Собственные рамку, фон и шрифт браузера приходится снимать, иначе список
+   перестаёт выглядеть списком. */
 .game {
     counter-increment: gamerank;
     display: flex;
@@ -687,8 +690,26 @@ h2.playtime .num { color: var(--text); }
     border-radius: 2px;
     min-width: 0;
     transition: background .15s ease;
+
+    width: 100%;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 .game:hover { background: var(--panel-hover); }
+.game:focus-visible {
+    outline: 1px solid var(--accent-line);
+    outline-offset: 1px;
+}
+
+/* Выбранная — та, что сейчас показана крупно. Без этой пары подсветок
+   непонятно, чью статистику видишь: номер держит акцент, фон — место. */
+.game.is-active { background: var(--panel-hover); }
+.game.is-active::before { color: var(--accent); }
+.game.is-active .game-info .playtime-forever { color: var(--dim); }
 
 .game::before {
     content: counter(gamerank, decimal-leading-zero);

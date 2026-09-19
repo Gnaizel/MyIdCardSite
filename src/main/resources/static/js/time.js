@@ -368,8 +368,14 @@ function displayMyGameLib() {
     fetch('/games')
         .then(rep => rep.json())
         .then(data => {
-            displayLastGame(data)
-            displayGameLib(data.slice(1));
+            /* Самую свежую игру больше не выбрасываем из списка: без неё
+               нумерация начиналась со второй, и «01» стояло не у той игры,
+               что показана крупно слева. */
+            displayGameLib(data);
+            showGame(data[0]);
+            /* Общие часы одни на весь блок и от выбранной игры не зависят,
+               поэтому запрашиваются один раз, а не на каждый клик. */
+            displayTotalHours();
         })
         .catch(err => {
             console.error("Ошибка при получении или отображении игр:", err);
@@ -379,15 +385,15 @@ function displayMyGameLib() {
         })
 }
 
-function displayLastGame(data) {
-    if (!data || data.length === 0) {
-        console.warn("Нет данных для отображения последней игры.");
-        return; 
+/* Крупный блок показывает выбранную игру, а не только самую свежую:
+   по клику в списке сюда приезжает статистика любой из них. */
+function showGame(game) {
+    if (!game) {
+        console.warn("Нет данных для отображения игры.");
+        return;
     }
 
-    const lastGame = data[0];
     const lastGameDiv = document.getElementById('last-game');
-
     if (!lastGameDiv) {
         console.warn("Элемент с id 'last-game' не найден.");
         return;
@@ -399,22 +405,33 @@ function displayLastGame(data) {
     gameHead.classList.add('game-head');
 
     gameHead.innerHTML = `
-        <img src="${esc(lastGame.img_icon_url)}" alt="" loading="lazy">
-        <h2 class="last-game-title" title="${esc(lastGame.name)}">${esc(lastGame.name)}</h2>`;
+        <img src="${esc(game.img_icon_url)}" alt="" loading="lazy">
+        <h2 class="last-game-title" title="${esc(game.name)}">${esc(game.name)}</h2>`;
 
     const gameInformation = document.createElement('div');
     gameInformation.classList.add('game-information');
 
     gameInformation.innerHTML = `
-        <h3 class="playtime-forever">playtime forever: ${esc(lastGame.playtime_forever)}</h3>
-        <h3 class="playtime-2weeks">playtime 2 weeks: ${esc(lastGame.playtime_2weeks)}</h3>
-        <h3 class="playtime-sessions">last played: ${esc(lastGame.rtime_last_played)}</h3>
+        <h3 class="playtime-forever">playtime forever: ${esc(game.playtime_forever)}</h3>
+        <h3 class="playtime-2weeks">playtime 2 weeks: ${esc(game.playtime_2weeks)}</h3>
+        <h3 class="playtime-sessions">last played: ${esc(game.rtime_last_played)}</h3>
     `;
-    setBannerImage(`${lastGame.banner_url}`);
-    displayTotalHours();
+    setBannerImage(`${game.banner_url}`);
 
     lastGameDiv.appendChild(gameHead);
     lastGameDiv.appendChild(gameInformation);
+
+    markSelected(game.appid);
+}
+
+/* Подсветка в списке должна совпадать с тем, что показано крупно, иначе
+   непонятно, чью статистику сейчас видишь. */
+function markSelected(appid) {
+    document.querySelectorAll('#game-lib .game').forEach(el => {
+        const active = String(el.dataset.appid) === String(appid);
+        el.classList.toggle('is-active', active);
+        el.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
 }
 
 function displayGameLib(data) {
@@ -422,8 +439,12 @@ function displayGameLib(data) {
     gameLib.innerHTML = ``;
 
     data.forEach(game => {
-        const gameElement = document.createElement('div');
+        /* Кнопка, а не div: таб, Enter и пробел начинают работать сами,
+           и не нужно городить обработчики клавиатуры руками. */
+        const gameElement = document.createElement('button');
+        gameElement.type = 'button';
         gameElement.classList.add('game');
+        gameElement.dataset.appid = game.appid;
 
         gameElement.innerHTML = `
                     <img src="${esc(game.img_icon_url)}" alt="" loading="lazy">
@@ -431,6 +452,7 @@ function displayGameLib(data) {
                         <div class="game-title" title="${esc(game.name)}">${esc(game.name)}</div>
                         <div class="playtime-forever">${esc(game.playtime_forever)}</div>
                     </div>`;
+        gameElement.addEventListener('click', () => showGame(game));
         gameLib.appendChild(gameElement);
     })
 }
