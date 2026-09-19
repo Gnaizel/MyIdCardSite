@@ -34,10 +34,15 @@ import java.util.Iterator;
 @RequiredArgsConstructor
 public class AvatarServiceImpl implements AvatarService {
     /* Фото с телефона приходит на 2-5 МБ, а отдавать такое на страницу нельзя.
-       Поэтому любое присланное изображение приводится к тем же параметрам,
-       что и лежавшее в сборке: квадрат 640 на 640 при колонке в 290px —
-       ровно двойной размер под retina. */
-    private static final float QUALITY = 0.85f;
+       Поэтому присланное приводится к квадрату 640 на 640: при колонке
+       в 290px это ровно двойной размер под retina.
+
+       Качество при этом подбирается под вес, а не задаётся жёстко: при
+       фиксированном 0.85 гладкое фото весит 40 КБ, а детализированное 90.
+       Разницу между ступенями видно на графике загрузки, а не на картинке,
+       поэтому идём сверху вниз и останавливаемся, как только уложились. */
+    private static final float[] QUALITY_STEPS = {0.85f, 0.78f, 0.70f, 0.62f};
+    private static final int TARGET_BYTES = 55 * 1024;
 
     /* Столько байт максимум принимаем на вход. Больше телеграм и не пришлёт
        сжатым фото, а файл вполне может быть и таким. */
@@ -170,6 +175,19 @@ public class AvatarServiceImpl implements AvatarService {
     }
 
     private byte[] encode(BufferedImage image) {
+        byte[] result = null;
+        for (float quality : QUALITY_STEPS) {
+            result = encodeAt(image, quality);
+            if (result.length <= TARGET_BYTES) {
+                return result;
+            }
+        }
+        /* Ниже последней ступени не спускаемся: фото с мелкой фактурой
+           бывает не ужать до цели, не превратив его в кашу. */
+        return result;
+    }
+
+    private byte[] encodeAt(BufferedImage image, float quality) {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
         if (!writers.hasNext()) {
             throw new AvatarRejected("в этой сборке java нет кодировщика jpeg");
@@ -180,7 +198,7 @@ public class AvatarServiceImpl implements AvatarService {
             writer.setOutput(out);
             ImageWriteParam params = writer.getDefaultWriteParam();
             params.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            params.setCompressionQuality(QUALITY);
+            params.setCompressionQuality(quality);
             writer.write(null, new IIOImage(image, null, null), params);
         } catch (IOException e) {
             throw new AvatarRejected("не запаковалась: " + e.getMessage());
