@@ -3,6 +3,7 @@ package ru.gnaizel.controller.music;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import ru.gnaizel.dto.music.RotationDto;
 import ru.gnaizel.dto.music.TrackDto;
 import ru.gnaizel.service.music.MusicBarService;
 
@@ -16,5 +17,10 @@ public class MusicBarController {
     @GetMapping("/tracks")
     public List<TrackDto> getRecentTracks() {
         return musicBarService.getRecentTracks();
+    }
+
+    @GetMapping("/rotation")
+    public RotationDto getRotation() {
+        return musicBarService.getRotation();
     }
 }

@@ -3,9 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, shrink-to-fit=no">
+    <meta name="theme-color" content="#070a08">
+    <meta name="description" content="sponj (aka gnaizel) — backend developer from Saratov. Java, C#, Python, PostgreSQL, Docker, Linux, homelab.">
+    <title>sponj</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
     <link rel="stylesheet" href="/css/myCard.css">
-    <script src="/js/time.js"></script>
-    <title>Gnaizel</title>
+
+    <script src="/js/time.js" defer></script>
 
     <link rel="icon" type="image/png" href="/image/icon/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/image/icon/favicon.svg" />
@@ -14,197 +22,219 @@
     <link rel="manifest" href="/image/icon/site.webmanifest" />
 </head>
 <body>
-    <div class="title-block">
-        <header>
-            <div class="profile">
-                <img src="/image/photo_2025-08-24_16-06-35.jpg" alt="avatar">
-                <div>
-                    <h1 class="nick"><span class="p-marks">@</span>Gnaizel</h1>
-                    <h2 class="tagline">Backend Developer</h2>
-                </div>
+    <main class="shell">
+
+        <div class="layout">
+        <aside class="col-side">
+
+        <section class="panel card-id">
+            <img class="avatar" src="/image/photo_2025-08-24_16-06-35.jpg" alt="sponj">
+            <div class="card-id-text">
+                <h1 class="wordmark">sponj<span class="wordmark-alias">aka @Gnaizel</span></h1>
+                <p class="role">backend developer</p>
             </div>
-    <!--        <div class="theme-toggle">☀️/🌙</div>-->
-        </header>
-    </div>
-
-    <div class="main">
-
-        <section class="bio">
-            <h2><span class="p-marks">//</span> Bio</h2>
-            <ul class="list">
-                <li><span class="p-marks">-</span> location: Saratov/Russia</li>
-                <li><span class="p-marks">-</span> local time: <span id="time"></span></li>
-                <li><span class="p-marks">-</span> timezone: UTC+4</li>
-                <li><span class="p-marks">-</span> age: <span id="old"></span></li>
-            </ul>
+            <nav class="nav">
+                <a href="https://github.com/Gnaizel" target="_blank" rel="noopener">github</a>
+                <a href="https://telegram.me/gnaizel" target="_blank" rel="noopener">telegram</a>
+            </nav>
         </section>
 
-        <section class="social">
-            <h2><span class="p-marks">//</span> Social</h2>
-            <ul class="list">
-                <li>
-                    <div class="contact-box">
-                        <img src="/image/github-svgrepo-com.svg" alt="icon">
-                        <a href="https://github.com/Gnaizel">github</a>
-                    </div>
-                </li>
-                <li>
-                    <div class="contact-box">
-                        <img src="/image/steam-svgrepo-com.svg" alt="icon">
-                        <a href="https://steamcommunity.com/id/Gnaisel/">steam</a>
-                    </div>
-                </li>
-                <li>
-                    <div class="contact-box">
-                        <img src="/image/telegram-svgrepo-com.svg" alt="icon">
-                        <a href="https://telegram.me/gnaizel">telegram</a>
-                    </div>
-                </li>
-                <li>
-                    <div class="contact-box">
-                        <img src="/image/last-fm-white-icon.svg" alt="icon">
-                        <a href="https://www.last.fm/user/Gnaizel">last.fm</a>
-                    </div>
-                </li>
-            </ul>
-        </section>
-
-        <section class="tech-stack">
-            <h2><span class="p-marks">//</span> Skills</h2>
-            <div class="skills-list">
-                <span class="skill-chip">Java</span>
-                <span class="skill-chip">Spring Boot</span>
-                <span class="skill-chip">Docker</span>
-                <span class="skill-chip">PostgreSQL</span>
-                <span class="skill-chip">Git</span>
+        <section class="panel">
+            <h2 class="panel-title">about</h2>
+            <div class="panel-body">
+                <ul class="meta-rows">
+                    <li><span class="k">age</span><span class="v"><span id="old">--</span></span></li>
+                    <li><span class="k">location</span><span class="v">Saratov, Russia</span></li>
+                    <li><span class="k">timezone</span><span class="v">UTC+4 · <span id="time">--:--:--</span></span></li>
+                    <li><span class="k">languages</span><span class="v">Russian, English</span></li>
+                </ul>
             </div>
         </section>
 
-        <section class="device">
-            <h2><span class="p-marks">//</span> Device</h2>
-            <div class="device-cards-container">
-                <div class="device-cards">
-                    <div class="device-card">
-                        <div class="device-header">💻 laptop</div>
-                        <ul class="device-specs">
-                            <li><img src="/image/gpu.png" alt="device-icon"> intel(R) UHD Graphics</li>
-                            <li><img src="/image/ram.png" alt="device-icon"> 8G RAM</li>
-                            <li><img src="/image/cpu.png" alt="device-icon"> i5-12450H</li>
-                            <li><img src="/image/disk.png" alt="device-icon"> 500G DISK</li>
-                        </ul>
+        <section class="panel">
+            <h2 class="panel-title">links</h2>
+            <div class="panel-body links">
+                <a class="link-card" href="https://github.com/Gnaizel" target="_blank" rel="noopener">
+                    <img src="/image/github-svgrepo-com.svg" alt="" aria-hidden="true">
+                    <span class="link-name">github</span>
+                    <span class="link-handle">/Gnaizel</span>
+                </a>
+                <a class="link-card" href="https://telegram.me/gnaizel" target="_blank" rel="noopener">
+                    <img src="/image/telegram-svgrepo-com.svg" alt="" aria-hidden="true">
+                    <span class="link-name">telegram</span>
+                    <span class="link-handle">@gnaizel</span>
+                </a>
+                <a class="link-card" href="https://steamcommunity.com/id/Gnaisel/" target="_blank" rel="noopener">
+                    <img src="/image/steam-svgrepo-com.svg" alt="" aria-hidden="true">
+                    <span class="link-name">steam</span>
+                    <span class="link-handle">/Gnaisel</span>
+                </a>
+                <a class="link-card" href="https://www.last.fm/user/Gnaizel" target="_blank" rel="noopener">
+                    <img src="/image/last-fm-white-icon.svg" alt="" aria-hidden="true">
+                    <span class="link-name">last.fm</span>
+                    <span class="link-handle">/Gnaizel</span>
+                </a>
+            </div>
+        </section>
+
+        </aside>
+        <div class="col-main">
+
+        <section class="panel card github">
+            <h2 class="panel-title">github</h2>
+            <p class="panel-sub">last 12 months &middot; private repos are counted, never named</p>
+            <div class="panel-body">
+                <div class="gh-stats">
+                    <div class="gh-stat">
+                        <span class="num" id="gh-total">--</span>
+                        <span class="lab">contributions</span>
                     </div>
-                    <div class="device-card">
-                        <div class="device-header">🖥️ pc</div>
-                        <ul class="device-specs">
-                            <li><img src="/image/gpu.png" alt="device-icon"> GeForce GTX 1660 SUPER</li>
-                            <li><img src="/image/ram.png" alt="device-icon"> 16G RAM</li>
-                            <li><img src="/image/cpu.png" alt="device-icon"> i7-11700K</li>
-                            <li><img src="/image/disk.png" alt="device-icon"> 3TB DISK</li>
-                        </ul>
+                    <div class="gh-stat">
+                        <span class="num" id="gh-commits">--</span>
+                        <span class="lab">commits</span>
                     </div>
-                    <div class="device-card">
-                        <div class="device-header">🗄️ server</div>
-                        <ul class="device-specs">
-                            <li><img src="/image/ram.png" alt="device-icon"> 16G RAM</li>
-                            <li><img src="/image/cpu.png" alt="device-icon"> Intel i5-9400F</li>
-                            <li><img src="/image/disk.png" alt="device-icon"> 1.8TB DISK</li>
-                        </ul>
+                    <div class="gh-stat">
+                        <span class="num" id="gh-repos">--</span>
+                        <span class="lab">repos touched</span>
+                    </div>
+                    <div class="gh-stat">
+                        <span class="num" id="gh-streak">--</span>
+                        <span class="lab">best streak</span>
+                    </div>
+                    <div class="gh-stat">
+                        <span class="num"><span class="add" id="gh-added">--</span><span class="del" id="gh-removed"></span></span>
+                        <span class="lab">lines this year</span>
                     </div>
                 </div>
+
+                <div class="scroller gh-scroller">
+                    <div class="scroll-rail">
+                        <div class="gh-calendar">
+                            <div id="gh-months" class="gh-months"></div>
+                            <div id="gh-heatmap" class="gh-heatmap" role="img"
+                                 aria-label="contribution heatmap"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gh-legend">
+                    <span>less</span>
+                    <span class="gh-cell" data-level="0"></span>
+                    <span class="gh-cell" data-level="1"></span>
+                    <span class="gh-cell" data-level="2"></span>
+                    <span class="gh-cell" data-level="3"></span>
+                    <span class="gh-cell" data-level="4"></span>
+                    <span>more</span>
+                </div>
             </div>
         </section>
 
-        <section class="music">
-            <div class="title">
-                <h2><span class="p-marks">//</span> Music</h2>
-                <h3 class="tagline"> The last tracks I listened to</h3>
-            </div>
-            <div class="track-list">
-                <div id="track-list" class="track-column"></div>
+        <section class="panel">
+            <h2 class="panel-title">stack</h2>
+            <div class="panel-body chips">
+                <span class="chip"><img class="chip-icon" src="/image/stack/postgresql.svg" alt="" aria-hidden="true"><span class="chip-name">PostgreSQL</span></span>
+                <span class="chip"><img class="chip-icon" src="/image/stack/java.svg" alt="" aria-hidden="true"><span class="chip-name">Java</span></span>
+                <span class="chip"><img class="chip-icon" src="/image/stack/csharp.svg" alt="" aria-hidden="true"><span class="chip-name">C#</span></span>
+                <span class="chip"><img class="chip-icon" src="/image/stack/python.svg" alt="" aria-hidden="true"><span class="chip-name">Python</span></span>
+                <span class="chip"><img class="chip-icon" src="/image/stack/git.svg" alt="" aria-hidden="true"><span class="chip-name">Git</span></span>
+                <span class="chip"><img class="chip-icon" src="/image/stack/docker.svg" alt="" aria-hidden="true"><span class="chip-name">Docker</span></span>
+                <span class="chip"><img class="chip-icon" src="/image/stack/linux.svg" alt="" aria-hidden="true"><span class="chip-name">Linux</span></span>
             </div>
         </section>
 
-
-        <section class="game-section">
-            <div class="title">
-                <h2><span class="p-marks">//</span> Games</h2>
-                <h3 class="tagline"> My game library</h3>
+        <section class="panel music">
+            <h2 class="panel-title">recently played</h2>
+            <p class="panel-sub">from last.fm</p>
+            <div class="panel-body scroller">
+                <button class="scroll-btn" type="button" data-scroll="-1" aria-label="scroll left">&lt;</button>
+                <div class="scroll-rail">
+                    <div id="track-list" class="track-column"></div>
+                </div>
+                <button class="scroll-btn" type="button" data-scroll="1" aria-label="scroll right">&gt;</button>
             </div>
 
-            <div class="game-bar">
+            <div class="rotation">
+                <div class="rotation-head">
+                    <span class="rotation-title">on rotation</span>
+                    <span class="rotation-sub" id="rotation-sub">last 12 months</span>
+                </div>
+                <ol id="rotation-list" class="rotation-list"></ol>
+                <p class="rotation-note" id="rotation-note"></p>
+            </div>
+        </section>
+
+        <section class="panel card game-section">
+            <h2 class="panel-title">steam</h2>
+            <p class="panel-sub">recently played, sorted by playtime</p>
+
+            <div class="panel-body game-bar">
                 <div class="game-left-section">
                     <div id="last-game" class="last-game">
-                        <div class="banner-background"></div>
                         <div class="game-head">
-                            <img src="/image/game-icon.jpg" alt="game-icon">
-                            <h2 class="last-game-title">game title</h2>
+                            <img src="/image/game-icon.jpg" alt="" aria-hidden="true">
+                            <h2 class="last-game-title">loading…</h2>
                         </div>
                         <div class="game-information">
-                            <h3 class="playtime-forever">Playtime forever: </h3>
-                            <h3 class="playtime-2weeks"> playtime 2weeks: </h3>
-                            <h3 class="playtime-sessions">Sessions: </h3>
+                            <h3 class="playtime-forever">playtime forever: --</h3>
+                            <h3 class="playtime-2weeks">playtime 2 weeks: --</h3>
+                            <h3 class="playtime-sessions">last played: --</h3>
                         </div>
                     </div>
                     <div class="info-box">
                         <div id="playtime-in-total" class="playtime-in-total">
-                            <img src="/image/clock.jpg" alt="time-img">
-                            <h2 class="playtime">All Time: </h2>
+                            <img src="/image/clock.png" alt="" aria-hidden="true">
+                            <h2 class="playtime">all time: <span class="num">--</span></h2>
                         </div>
                     </div>
                 </div>
                 <div class="game-right-section">
-                    <div id="game-lib" class="game-lib">
-                        <div class="game">
-                            <img src="/image/game-icon.jpg" alt="game-icon">
-                            <div class="game-info">
-                                <div class="game-title">game name</div>
-                                <div class="playtime-forever">3h</div>
-                            </div>
-                        </div>
-                        <div class="game">
-                            <img src="/image/game-icon.jpg" alt="game-icon">
-                            <div class="game-info">
-                                <div class="game-title">Milk inside a bag of milk inside a bag of milk</div>
-                                <div class="playtime-forever">3h</div>
-                            </div>
-                        </div>
-                        <div class="game">
-                            <img src="/image/game-icon.jpg" alt="game-icon">
-                            <div class="game-info">
-                                <div class="game-title">game name</div>
-                                <div class="playtime-forever">3h</div>
-                            </div>
-                        </div>
-                        <div class="game">
-                            <img src="/image/game-icon.jpg" alt="game-icon">
-                            <div class="game-info">
-                                <div class="game-title">game name</div>
-                                <div class="playtime-forever">3h</div>
-                            </div>
-                        </div>
-                        <div class="game">
-                            <img src="/image/game-icon.jpg" alt="game-icon">
-                            <div class="game-info">
-                                <div class="game-title">game name</div>
-                                <div class="playtime-forever">3h</div>
-                            </div>
-                        </div>
-                        <div class="game">
-                            <img src="/image/game-icon.jpg" alt="game-icon">
-                            <div class="game-info">
-                                <div class="game-title">game name</div>
-                                <div class="playtime-forever">3h</div>
-                            </div>
-                        </div>
-                    </div>
+                    <div id="game-lib" class="game-lib"></div>
                 </div>
             </div>
         </section>
 
+        <section class="panel card blackmail">
+            <h2 class="panel-title">blackmail box</h2>
+            <p class="panel-sub">anonymous &middot; nobody sees it but me &middot; 280 characters, no links</p>
+            <div class="panel-body">
+                <form id="gb-form" class="gb-composer" novalidate>
+                    <div class="gb-line">
+                        <span class="gb-prompt" aria-hidden="true">&gt;</span>
+                        <input id="gb-nick" class="gb-nickfield" type="text" maxlength="24"
+                               autocomplete="off" placeholder="anon" aria-label="nick, optional">
+                    </div>
+
+                    <textarea id="gb-body" class="gb-bodyfield" rows="2" maxlength="280"
+                              placeholder="say something" aria-label="message"></textarea>
+
+                    <div class="gb-actions">
+                        <!-- кнопки рисует скрипт: список рожиц лежит в time.js,
+                             там же он и правится -->
+                        <div id="gb-faces" class="gb-faces" role="group" aria-label="emoticons"></div>
+                        <span id="gb-status" class="gb-status" role="status" aria-live="polite"></span>
+                        <span id="gb-count" class="gb-count">280</span>
+                        <button id="gb-submit" class="gb-submit" type="submit">send</button>
+                    </div>
+
+                    <!-- Ловушка для ботов: людям не видна, скринридерам скрыта,
+                         табом не достаётся. Заполнено — значит не человек. -->
+                    <div class="gb-trap" aria-hidden="true">
+                        <label for="gb-website">website</label>
+                        <input id="gb-website" type="text" tabindex="-1" autocomplete="off">
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        </div>
+        </div>
+
         <footer>
-            <div id="quote">// Ага</div>
-            <div>number of visits: <span id="number-of-visits"></span></div>
+            <div class="quote">
+                <span class="quote-mark" aria-hidden="true">//</span>
+                <span class="quote-text" id="quote-text">stay curious</span>
+            </div>
         </footer>
-    </div>
+    </main>
 </body>
 </html>

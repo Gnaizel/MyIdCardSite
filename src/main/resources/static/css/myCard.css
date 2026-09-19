@@ -1,820 +1,1175 @@
+/* ===========================================================================
+   Gnaizel — personal card
+   ---------------------------------------------------------------------------
+   Чёрно-зелёная тема, одна на весь сайт: моноширинный шрифт, ни одной рамки,
+   один приглушённый акцент. Секции ничем не обведены — их держат воздух и
+   заголовок [ ... ]; заливка остаётся только у карточек, по которым реально
+   кликают или скроллят. Зелёный живёт в интерактиве, скобках и маркерах, но
+   не в основном тексте — иначе страница уходит в неон.
+   Перекрасить всё: --accent и --accent-rgb рядом с ним.
+   =========================================================================== */
+
 :root {
-    --bg: #000000;
-    --text: #f0f0f0;
-    --accent: #ffffff;
-    --muted: rgba(255, 255, 255, 0.6);
-    --box-bg: rgba(255, 255, 255, 0.05);
-    --chip-bg: rgba(255,255,255,0.08);
+    /* поверхности */
+    --bg:          #070a08;
+    --panel:       #0d130f;
+    --panel-soft:  #111a14;
+    --panel-hover: #17211a;
+    --line:        #24332b;
+    --line-soft:   #1b261f;
+
+    /* текст */
+    --text:   #dde8e0;
+    --strong: #ffffff;
+    --muted:  #87a091;
+    --dim:    #5e7466;
+    --faint:  #3a4a3f;
+
+    /* Акцент. --accent-rgb нужен heatmap'у, полоскам ротации и подложкам:
+       они красят прозрачностью того же цвета, чтобы шкала не разъезжалась
+       с акцентом. --accent-mark — маркеры списков, самый тихий из зелёных. */
+    --accent:      #46c07a;
+    --accent-soft: rgba(70, 192, 122, .10);
+    --accent-line: rgba(70, 192, 122, .40);
+    --accent-mark: rgba(70, 192, 122, .55);
+    --accent-rgb:  70, 192, 122;
+
+    --font: "JetBrains Mono", ui-monospace, "SF Mono", "Consolas", "DejaVu Sans Mono", monospace;
+
+    --radius: 4px;
+    /* Три яруса скруглений: мелочь вроде кнопок и полей — --radius, плитки
+       (логотипы стека, ссылки, треки) — --radius-tile, «герои» — --radius-card. */
+    --radius-tile: 10px;
+    /* мягкая карточка: ею выделены только «герои», прочие секции без краёв */
+    --radius-card: 20px;
+    --shell:  1000px;
+    --side:   290px;
 }
+
+/* --------------------------------------------------------------- reset -- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { background: var(--bg); }
 
 body {
+    margin: 0;
+    padding: 0 20px;
     background: var(--bg);
     color: var(--text);
-    font-family: monospace;
-    margin: 0;
-    padding: 2rem;
-    max-width: 680px;
-    margin-inline: auto;
-    font-size: 16px;
-    line-height: 1;
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
 }
 
-h2 {
-    font-size: 1.2rem;
-    font-weight: bold;
-    margin: 2rem 0 1rem 0;
-}
-
-h3 {
-    font-size: .9rem;
-}
-
-.p-marks {
-    color: var(--muted);
-}
+h1, h2, h3, h4, p, ul, figure { margin: 0; padding: 0; }
+ul { list-style: none; }
+img { display: block; }
 
 a {
+    color: var(--text);
     text-decoration: none;
-    color: var(--accent);
-    font-weight: bold;
+    transition: color .15s ease;
+}
+a:hover { color: var(--accent); }
+
+::selection { background: var(--accent-line); color: #fff; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+/* --------------------------------------------------------------- shell -- */
+
+.shell {
+    position: relative;
+    z-index: 1;
+    max-width: var(--shell);
+    margin-inline: auto;
+    padding-block: 64px 0;
 }
 
-a:hover {
-    text-decoration: underline;
+/* -------------------------------------------------------------- layout --
+   Две колонки: слева узкая «визитка» (кто я), справа широкая лента (что я
+   слушаю/на чём сижу/во что играю). Раньше всё шло одной стопкой одинаковых
+   коробок — не за что зацепиться глазу. */
+
+.layout {
+    display: grid;
+    grid-template-columns: var(--side) minmax(0, 1fr);
+    gap: 34px;
+    align-items: start;
 }
 
-ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-ul li {
-    margin: 0.3rem 0;
-}
-
-/* Контакты в линию */
-.social ul {
+.col-side,
+.col-main {
     display: flex;
-    column-gap: 10px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 30px;
+    min-width: 0;
 }
 
-.contact-box {
-    background: var(--box-bg);
-    border-radius: 6px;
-    padding: 0.5rem 0.9rem;
+/* в узкой колонке ссылки в два столбца не помещаются */
+.col-side .links { grid-template-columns: minmax(0, 1fr); }
+
+/* ------------------------------------------------------- карточка-имя -- */
+
+/* Левый флаг, как у всей остальной страницы: центрированный блок посреди
+   левофлаговой вёрстки и был главной причиной, почему шапка выглядела
+   приклеенной со стороны. */
+.card-id {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* крупное фото — единственная большая точка на странице, всё остальное мельче */
+.card-id .avatar {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--radius);
+}
+
+.card-id-text { min-width: 0; }
+
+/* 28px — предел, в котором моноширинный шрифт ещё выглядит набранным, а не
+   растянутым, и при этом остаётся крупнейшим текстом страницы.
+   > повторяет приглашение из гостевой: имя говорит на языке остального сайта. */
+/* Ник и алиас одной строкой: алиас перестаёт быть отдельной мелкой строкой
+   в стопке и читается как приписка к имени. */
+.wordmark {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    /* Расстояния тут точечные, потому что они разные: приглашение жмётся
+       к имени, а алиас наоборот отодвинут. Первое число — перенос строки. */
+    gap: 2px .3em;
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--strong);
+    line-height: 1.15;
+}
+
+/* Своего отступа у приглашения нет: как флекс-элемент оно и так получает
+   зазор контейнера, а вместе с margin выходило 20px вместо 7. */
+.wordmark::before {
+    content: ">";
+    color: var(--accent);
+}
+
+/* второй ник — тише всего на странице: он подпись, а не заголовок */
+.wordmark-alias {
+    margin-left: .25em;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: .02em;
+    line-height: 1.4;
+    color: var(--dim);
+}
+
+/* под алиасом нужен воздух, иначе две мелкие строки читаются одним комком */
+.role {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.card-id .nav {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+}
+.card-id .nav a { color: var(--dim); }
+.card-id .nav a:hover { color: var(--accent); }
+
+/* --------------------------------------------------------------- panel -- */
+
+/* Секция — не коробка. Ни рамки, ни фона, ни падингов: её границы задаёт
+   пустое место вокруг и заголовок сверху, поэтому своих стилей у .panel нет —
+   класс остаётся опорой для .panel.card и разметки. */
+
+/* «Герой»: секция, которую видно первой. Край едва светлее заливки, как на
+   keetsta/subarashi — рамка не очерчивает блок, а приподнимает его. */
+.panel.card {
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-card);
+    padding: 20px 22px 22px;
+}
+
+/* заголовок чуть зеленее общего muted — это осталось от зелёной темы */
+.panel-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: #a6c6b2;
+    letter-spacing: .04em;
+}
+/* скобки держат акцент: без рамок это единственный якорь начала секции */
+.panel-title::before { content: "[ "; color: var(--accent); }
+.panel-title::after  { content: " ]"; color: var(--accent); }
+
+.panel-sub {
+    font-size: 12.5px;
+    color: var(--dim);
+}
+
+.panel-body { margin-top: 12px; }
+
+/* ------------------------------------------------------------ metadata -- */
+
+.meta-rows li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 10px;
+    padding: 2px 0;
+}
+.meta-rows li::before {
+    content: "—";
+    color: var(--accent-mark);
+    flex: 0 0 auto;
+}
+.meta-rows .k { color: var(--dim); }
+.meta-rows .v { color: var(--text); }
+
+/* --------------------------------------------------------------- chips -- */
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    transition: background 0.2s;
-}
-.contact-box:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.contact-box img {
-    width: 18px;
-    height: 18px;
-}
-
-/* Skills как чипы */
-.skills-list {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.skill-chip {
-    background: var(--chip-bg);
-    padding: 0.3rem 0.8rem;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    transition: background 0.2s;
-}
-.skill-chip:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 0.6rem;
-}
-
-td {
-    padding: 6px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.theme-toggle {
-    cursor: pointer;
-    background: var(--box-bg);
-    border-radius: 8px;
-    padding: .6rem  .6rem;
-    flex-shrink: 0;
-}
-
-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.profile {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    line-height: 6px;
-    gap: 1.1rem;
-    justify-content: start;
-    min-height: 140px;
-}
-
-.list {
-    margin: 0;
-    padding-left:9px;
-}
-
-.tagline {
-    color: rgba(255, 255, 255, 0.23);
-}
-
-h1.nick {
-    color: var(--accent);
-    display: flex;
-    font-size: 2rem;
-    font-weight: bold;
-    margin: 0;
-    text-align: right;
-}
-
-.profile img {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    border: 2px solid rgba(128, 128, 128, 0.3);
-    object-fit: cover;
-    align-self: flex-start;
-}
-footer {
-    flex-direction: column;
-    gap: 6px;
-    display: flex;
-    margin-bottom: 2rem;
-    margin-top: 2rem;
-    text-align: center;
+    gap: 7px;
+    border-radius: var(--radius-tile);
+    background: var(--panel-soft);
     color: var(--muted);
-    font-size: .8rem;
+    padding: 9px;
+    font-size: 12.5px;
+    transition: background .15s ease;
+}
+.chip:hover { background: var(--panel-hover); }
+
+/* Логотипы приглушены до монохрома и оживают по наведению — ровно та же
+   обработка, что у иконок в ссылках, чтобы блоки читались как родня. */
+.chip-icon {
+    width: 26px;
+    height: 26px;
+    flex: 0 0 auto;
+    filter: grayscale(1) brightness(1.35);
+    opacity: .7;
+    transition: filter .15s ease, opacity .15s ease;
+}
+.chip:hover .chip-icon {
+    filter: none;
+    opacity: 1;
 }
 
-.device-card img {
-    height: 1rem;
-    width: 1rem;
+/* Название всплывает под чипом. Из разметки оно никуда не девается, только
+   прячется прозрачностью, поэтому скринридер читает его всегда. Снизу, а не
+   сверху: сверху подсказка налезала бы на заголовок [ stack ]. */
+.chip-name {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--panel-hover);
+    color: var(--text);
+    font-size: 11.5px;
+    line-height: 1.4;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease;
+}
+.chip:hover .chip-name { opacity: 1; }
+
+/* На тач-экранах наведения не существует, и подсказку было бы не достать —
+   там названия просто стоят рядом с логотипом, как раньше. */
+@media (hover: none) {
+    .chip { padding: 5px 12px 5px 9px; }
+    /* здесь смысл несёт подпись, а не значок, поэтому логотип поменьше */
+    .chip-icon { width: 18px; height: 18px; }
+    .chip-name {
+        position: static;
+        transform: none;
+        z-index: auto;
+        padding: 0;
+        background: none;
+        color: inherit;
+        font-size: 12.5px;
+        opacity: 1;
+    }
+}
+.chip:hover {
+    color: var(--text);
+    background: var(--panel-hover);
 }
 
-.device-cards {
+/* --------------------------------------------------------------- links -- */
+
+.links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.link-card {
     display: flex;
-    gap: 1rem;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    margin-top: 1rem;
-    padding-bottom: 1rem;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 13px;
+    border-radius: var(--radius-tile);
+    background: var(--panel-soft);
+    min-width: 0;
+    transition: background .15s ease, box-shadow .15s ease;
+}
+/* вместо подсветки рамки — заливка и акцентная засечка слева */
+.link-card:hover {
+    background: var(--accent-soft);
+    box-shadow: inset 2px 0 0 var(--accent);
+    color: var(--text);
+}
+
+/* Логотипы приглушены до монохрома, цвет возвращается по наведению.
+   brightness(0) invert(1) здесь не годится: у telegram/steam заливка и глиф
+   схлопываются в один белый круг. */
+.link-card img {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    filter: grayscale(1) brightness(1.35);
+    opacity: .7;
+    transition: filter .15s ease, opacity .15s ease;
+}
+.link-card:hover img {
+    filter: none;
+    opacity: 1;
+}
+
+.link-name { color: var(--text); font-size: 13px; }
+
+.link-handle {
+    margin-left: auto;
+    color: var(--dim);
+    font-size: 12.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------ h-scroll shell -- */
+
+.scroller { position: relative; }
+
+/* --fade-* выставляет initScrollers(): край растворяется только с той стороны,
+   куда ленту ещё можно прокрутить. */
+.scroll-rail {
+    --fade-l: 0px;
+    --fade-r: 0px;
     overflow-x: auto;
     overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-    position: relative;
     scrollbar-width: none;
     -ms-overflow-style: none;
-}
-
-.device-cards-container::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 40px;
-    background: linear-gradient(to right, transparent, var(--bg));
-    pointer-events: none;
-    opacity: 1;
-    z-index: 2;
-}
-
-.device-cards::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
-}
-
-.device-cards::-webkit-scrollbar-track {
-    background: var(--box-bg);
-    border-radius: 3px;
-}
-
-.device-cards::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-}
-
-.device-cards::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
-
-.device-card {
-    padding: 1rem;
-    background: var(--box-bg);
-    border-radius: 10px;
-    display: flex;
-    flex-shrink: 0;
-    gap: .6rem;
-    flex-direction: column;
-    transition: transform .2s, background .2s;
-    scroll-behavior: smooth;
-}
-
-.playtime-in-total {
-    display: flex;
-    box-sizing: border-box;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-}
-
-.playtime-in-total img {
-    width: 20px;
-    height: 20px;
-}
-
-.device-cards h2 {
-    width: 100%;
-    margin: 0 0 0.5rem 0;
-}
-
-.device-header {
-    display: flex;
-    gap: .6rem;
-    align-items: center;
-}
-
-.device-card:hover {
-    transform: scale(1.03);
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.device-cards-container {
-    position: relative;
-    width: 100%;
-}
-
-.player {
-    position: relative;
-    overflow: hidden;
-    margin-top: 1rem;
-    width: 100%;
-}
-
-.title {
-    width: 100%;
-    display: flex;
-    align-items: start;
-    flex-direction: column;
-    margin-bottom: 5px;
-
-}
-
-.title h2 {
-    margin-bottom: 5px;
-}
-
-.title h3 {
-    margin-top: 0;
-}
-
-.track-list {
-    display: flex;
-    overflow-x: auto;
-    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    gap: 10px;
-    margin: 0;
+    scroll-behavior: smooth;
+    mask-image: linear-gradient(to right,
+        transparent 0, #000 var(--fade-l),
+        #000 calc(100% - var(--fade-r)), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right,
+        transparent 0, #000 var(--fade-l),
+        #000 calc(100% - var(--fade-r)), transparent 100%);
+}
+.scroll-rail::-webkit-scrollbar { display: none; }
+
+/* стрелки — тихие, появляются при наведении на блок */
+.scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 24px;
+    height: 46px;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--panel-soft);
+    color: var(--muted);
+    font-family: var(--font);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
     padding: 0;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
+    opacity: 0;
+    transition: opacity .15s ease, color .15s ease, background .15s ease;
 }
+.scroller:hover .scroll-btn { opacity: 1; }
+.scroll-btn:hover { color: var(--text); background: var(--panel-hover); }
+.scroll-btn:focus-visible { opacity: 1; outline: 1px solid var(--accent-line); }
+.scroll-btn[data-scroll="-1"] { left: 0; }
+.scroll-btn[data-scroll="1"]  { right: 0; }
 
-.track-list::-webkit-scrollbar {
-    display: none; /* Chrome, Safari */
-}
+/* прятать стрелку, если в эту сторону листать уже некуда */
+.scroller:not(.can-left)  .scroll-btn[data-scroll="-1"],
+.scroller:not(.can-right) .scroll-btn[data-scroll="1"] { display: none; }
 
-.track.playing {
-    border: 2px solid rgba(243, 219, 210, 0.8);
-    box-shadow: 0 0 8px rgba(243, 219, 210, 0.4);
-    animation: borderPulse 1s infinite alternate;
-}
-
-@keyframes borderPulse {
-    0% {
-        border-color: rgba(243, 219, 210, 0.5);
-        box-shadow: 0 0 4px rgba(243, 219, 210, 0.2);
-    }
-    100% {
-        border-color: rgba(243, 219, 210, 1);
-        box-shadow: 0 0 12px rgba(243, 219, 210, 0.5);
-    }
-}
+/* -------------------------------------------------------------- tracks -- */
 
 .track-column {
     display: flex;
-    gap: 10px;
     flex-direction: row;
     flex-wrap: nowrap;
-    overflow: visible;
+    gap: 8px;
     width: max-content;
-}
-
-.track:not(:first-child) {
-    margin-top: 9px;
-}
-
-h3.tagline {
-    padding-left: 1.4rem;
+    padding: 1px;
 }
 
 .track {
     flex: 0 0 auto;
-    max-width: 300px;
-    max-height: 70px;
-    flex-shrink: 0;
-    box-sizing: border-box;
-    overflow: hidden;
-    line-height: 1.4rem;
-    margin-top: 10px;
+    width: 232px;
     display: flex;
     align-items: center;
-    background: var(--box-bg);
-    transition: transform 0.2s, background 0.2s;
-    border-radius: 20px;
-    padding: 10px;
     gap: 10px;
+    padding: 9px;
+    border-radius: var(--radius-tile);
+    background: var(--panel-soft);
+    overflow: hidden;
+    transition: background .15s ease;
 }
-
 .track:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--panel-hover);
 }
 
 .track img {
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
     object-fit: cover;
-    padding-left: 2px;
-    border-radius: 12px;
-    flex-shrink: 0;
+    /* обложка внутри скруглённой плитки: острые 2px рядом с 10px выпирали */
+    border-radius: 6px;
 }
 
 .track-info {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    flex: 1 1 auto;
+    line-height: 1.4;
 }
 
 .track-name {
-    font-weight: bold;
-    font-size: 16px;
+    color: var(--text);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-artist {
+    color: var(--dim);
+    font-size: 12.5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .track-time-later {
-    height: 0;
-    opacity: 0.4;
-    padding: .5rem;
-    font-size: 14px;
-    font-weight: bold;
+    flex: 0 0 auto;
+    align-self: flex-start;
+    color: var(--faint);
+    font-size: 12px;
     white-space: nowrap;
-    color: var(--muted);
 }
 
-.track-artist {
-    font-size: 14px;
-    color: #aaa;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* «сейчас играет» помечаем засечкой и подложкой, а не обводкой */
+.track.playing {
+    background: var(--accent-soft);
+    box-shadow: inset 2px 0 0 var(--accent);
 }
 
-.track-list::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 40px;
-    pointer-events: none;
-    z-index: 1;
+/* Эквалайзер вместо статичной точки: три полоски, каждая со своей фазой.
+   Базовые высоты разные, поэтому при prefers-reduced-motion анимация гаснет,
+   а индикатор всё равно читается — просто замирает. */
+.eq { display: none; }
+.track.playing .eq {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-end;
+    gap: 2px;
+    height: 11px;
+}
+.eq i {
+    display: block;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--accent);
+    transform-origin: bottom;
+    animation: eq 1.1s ease-in-out infinite;
+}
+.eq i:nth-child(1) { height: 5px;  animation-delay: -.65s; }
+.eq i:nth-child(2) { height: 11px; animation-delay: -.2s; }
+.eq i:nth-child(3) { height: 7px;  animation-delay: -.95s; }
+
+@keyframes eq {
+    0%, 100% { transform: scaleY(.3); }
+    50%      { transform: scaleY(1); }
 }
 
+/* у активного трека место занято эквалайзером, а не «5 минут назад» */
+.track.playing .track-time-later { display: none; }
 
-.track-list::after {
-    right: 0;
-    background: linear-gradient(to left, var(--bg), transparent);
+/* трек сменился — карточка мигает появлением, чтобы это было заметно
+   боковым зрением, но не дёргало страницу */
+.track.is-new { animation: track-in .28s ease-out; }
+
+@keyframes track-in {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: none; }
 }
+
+/* --------------------------------------------------------------- steam -- */
 
 .game-bar {
-    display: flex;
-    height: 300px;
-    border-radius: 40px 0 0 40px;
-    border: 2px solid #000000;
-    margin-top: -15px;
-    width: 100%;
-    background: rgba(7, 7, 7, 1);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
 }
 
 .game-left-section {
-    padding: 20px;
     display: flex;
-    align-items: center;
     flex-direction: column;
-    gap: 19px;
-    width: 40%;
+    gap: 8px;
+    min-width: 0;
 }
 
 .last-game {
-    box-sizing: border-box;
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 158px;
+    border-radius: var(--radius);
+    background: var(--panel-soft);
+    padding: 13px 15px;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: 10px;
-    border-radius: 20px;
-    overflow: hidden;
-    height: 200px;
-    background: var(--box-bg);
-    width: 100%;
-    position: relative;
-}
-
-.banner-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 50%;
-    z-index: 1;
-    pointer-events: none;
-    background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0.7) 0%,
-            rgba(0, 0, 0, 0.5) 33%,
-            rgba(0, 0, 0, 0.3) 66%,
-            rgba(0, 0, 0, 0) 100%
-    );
-    opacity: 0;
-    transition: opacity 1.5s ease-in-out;
+    gap: 12px;
 }
 
 .banner-image {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 50%;
+    inset: 0 0 auto 0;
+    height: 58%;
     background-size: cover;
     background-position: center;
-    z-index: 1;
-    pointer-events: none;
     opacity: 0;
-    transition: opacity 1.5s ease-in-out;
-
-    mask-image: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 1) 0%,
-            rgba(0, 0, 0, 0.8) 20%,
-            rgba(0, 0, 0, 0.6) 40%,
-            rgba(0, 0, 0, 0.4) 60%,
-            rgba(0, 0, 0, 0.2) 80%,
-            rgba(0, 0, 0, 0) 100%
-    );
-    -webkit-mask-image: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 1) 0%,
-            rgba(0, 0, 0, 0.8) 20%,
-            rgba(0, 0, 0, 0.6) 40%,
-            rgba(0, 0, 0, 0.4) 60%,
-            rgba(0, 0, 0, 0.2) 80%,
-            rgba(0, 0, 0, 0) 100%
-    );
+    transition: opacity .8s ease;
+    z-index: 0;
+    filter: saturate(.4) brightness(.55);
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,.7), rgba(0,0,0,0));
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.7), rgba(0,0,0,0));
 }
-
 
 .game-head,
-.game-information {
-    position: relative;
-    z-index: 2;
-}
+.game-information { position: relative; z-index: 1; }
 
 .game-head {
-    overflow: hidden;
-    display: flex;
-    gap: .9rem;
-    flex-direction: row;
-}
-
-.game-information {
-    display: flex;
-    padding-left: .5rem;
-    flex-direction: column;
-    align-items: start;
-}
-
-.game-information h3 {
-    line-height: 0;
-}
-
-.game-title {
-    font-size: .85rem;
-}
-
-.last-game-title {
     display: flex;
     align-items: center;
-    margin-bottom: 0;
+    gap: 10px;
+    min-width: 0;
+}
+
+.game-head img {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    object-fit: cover;
+    border-radius: 2px;
 }
 
 h2.last-game-title {
-    color: #fff;
-    font-weight: 700;
-    margin-top: 0;
-    text-shadow:
-            0 0 5px #000,
-            0 0 10px #000,
-            0 0 15px #000;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--strong);
+    line-height: 1.4;
+    min-width: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
-h2.game-title {
-    flex-direction: row;
-    margin-top: 0;
+.game-information {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
 }
+
+.game-information h3 {
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--dim);
+    display: flex;
+    gap: 9px;
+}
+.game-information h3::before { content: "—"; color: var(--accent-mark); }
 
 .info-box {
-    box-sizing: border-box;
+    flex: 0 0 auto;
+    border-radius: var(--radius);
+    background: var(--panel-soft);
+    padding: 10px 15px;
+}
+
+.playtime-in-total {
     display: flex;
-    overflow: hidden;
-    justify-items: start;
-    padding-left: 15px;
     align-items: center;
-    border-radius: 20px;
-    background: var(--box-bg);
-    height: 50px;
-    width: 100%;
+    gap: 9px;
 }
-
-.game-section {
-    display: flex;
-    gap: 15px;
-    flex-direction: column;
+.playtime-in-total img {
+    width: 13px;
+    height: 13px;
+    opacity: .34;
+    filter: brightness(0) invert(1);
 }
-
-.last-game img {
-    height: 60px;
-    width: 60px;
-    border: 1px solid #000000;
-    border-radius: 10px;
+h2.playtime {
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--dim);
 }
+h2.playtime .num { color: var(--text); }
 
 .game-right-section {
-    padding: 0;
-    display: flex;
-    width: 50%;
-    margin-left: auto;
-    border-radius: 30px 0 0 30px;
-    background: linear-gradient(270deg, rgba(0, 0, 0, 0.8) 0%,
-    rgba(12,12,12,1) 30%,
-    rgb(12, 12, 12) 100%);
+    border-radius: var(--radius);
+    background: var(--panel-soft);
+    min-width: 0;
     overflow: hidden;
 }
 
 .game-lib {
+    counter-reset: gamerank;
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    padding: 20px;
-    width: 100%;
-    height: 100%;
+    max-height: 244px;
     overflow-y: auto;
-    max-height: 100vh;
-}
-
-.game-lib::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-}
-
-.game-lib::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.game-lib::-webkit-scrollbar-thumb {
-    background: transparent;
-}
-
-.game-lib::-webkit-scrollbar-thumb:hover {
-    background: transparent;
-}
-
-/* Скрываем scrollbar для Firefox */
-.game-lib {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE и Edge */
+    padding: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
 }
 
 .game {
-    align-items: center;
+    counter-increment: gamerank;
     display: flex;
-    box-sizing: border-box;
+    align-items: center;
     gap: 10px;
+    padding: 4px 6px;
+    border-radius: 2px;
+    min-width: 0;
+    transition: background .15s ease;
 }
+.game:hover { background: var(--panel-hover); }
 
-h2.playtime {
-    margin: 0;
-}
-
-.game-info {
-    width: 80%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    gap: 5px;
-    flex-direction: column;
+.game::before {
+    content: counter(gamerank, decimal-leading-zero);
+    flex: 0 0 auto;
+    color: var(--faint);
+    font-size: 11.5px;
 }
 
 .game img {
-    border-radius: 10px;
-    height: 40px;
-    width: 40px;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    object-fit: cover;
+    border-radius: 2px;
 }
 
-/*  для мабилки */
-@media (max-width: 768px) {
-    .game-bar {
-        flex-direction: column;
-        height: auto;
-        border-radius: 20px;
-        width: 100%;
-    }
-
-    .game-right-section {
-        background: linear-gradient( 360deg, rgba(0, 0, 0, 0.8) 0%,
-        rgba(12, 12, 12, 1) 30%,
-        rgb(12, 12, 12) 100%);
-    }
-
-    .game-left-section,
-    .game-right-section {
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 15px;
-        box-sizing: border-box;
-    }
-
-    h2.last-game-title {
-        font-size: 1.2rem;
-        font-weight: bold;
-    }
-
-    .game-left-section {
-        align-items: stretch;
-    }
-
-    .game-right-section {
-        border-radius: 0 0 20px 20px;
-    }
-
-    .last-game,
-    .info-box {
-        width: 100% !important;
-        height: 100%;
-        min-height: 40px;
-    }
-
-    .game-lib {
-        max-height: 300px;
-        overflow-y: auto;
-    }
+.game-info {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
-@media (max-width: 768px) {
-
-    .device-cards {
-        display: flex;
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-        gap: 1rem;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scroll-snap-type: x mandatory;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: .5rem;
-    }
-
-    .device-cards h2 {
-        display: flex;
-        flex: 0 0 100%;
-    }
-
-    .device-card {
-        flex: 0 0 auto;
-        min-width: max-content;
-        scroll-snap-align: start;
-    }
-
-    @media (hover: hover) {
-        .device-card:hover {
-            transform: translateY(-2px);
-            background: rgba(255, 255, 255, 0.08);
-        }
-    }
-
-    /*.device-card {*/
-    /*    padding: 1rem;*/
-    /*    background: var(--box-bg);*/
-    /*    border-radius: 10px;*/
-    /*    display: flex;*/
-    /*    width: 100%;*/
-    /*    gap: .6rem;*/
-    /*    flex-direction: column;*/
-    /*    transition: transform .2s, background .2s;*/
-    /*}*/
-
-    .track-list {
-        flex-direction: row;
-        gap: 0;
-    }
-
-    .track-column {
-        max-width: 100%;
-        width: 100%;
-    }
-
-    .track {
-        line-height: 1.1rem;
-        max-height: 60px;
-    }
-
-    .track img {
-        width: 40px;
-        height: 40px;
-    }
-
-    .track-name {
-        font-size: 14px;
-    }
-
-    .track-artist {
-        font-size: 12px;
-    }
-
-    body {
-        font-size: 14px;
-    }
-
-    h1.nick {
-        font-size: 1.5rem;
-    }
-
-    h2 {
-        font-size: 1rem;
-    }
-
-    /*.device td {*/
-    /*    font-size: 13px;*/
-    /*}*/
+.game-info .game-title {
+    font-size: 12.5px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
-@media (max-width: 480px) {
-    body {
-        font-size: 13px;
-    }
+.game-info .playtime-forever {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: var(--faint);
+}
+.game:hover .game-info .playtime-forever { color: var(--dim); }
 
-    h1.nick {
-        font-size: 1.7rem;
-    }
+/* -------------------------------------------------------------- github --
+   Наружу приходят одни числа: ни имён репозиториев, ни сообщений коммитов.
+   Поэтому вся секция — это счётчики и календарь, а не лента изменений. */
 
-    h2 {
-        font-size: 1rem;
-    }
-
-    .device-cards td {
-        font-size: 12px;
-    }
+.gh-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    margin-bottom: 16px;
 }
 
-.device-cards td:first-child {
-    font-weight: bold;
-    padding-right: 12px;
+.gh-stat {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+}
+
+.gh-stat .num {
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.gh-stat .lab {
+    font-size: 11.5px;
+    color: var(--muted);
+    letter-spacing: .03em;
+}
+
+.gh-stat .add { color: var(--accent); }
+.gh-stat .del { color: var(--muted); margin-left: 8px; }
+
+/* календарь шире колонки на узких экранах — кладём его в ту же ленту,
+   что треки и железо, чтобы работали те же затухания края */
+.gh-calendar {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: max-content;
+    padding: 1px;
+}
+
+.gh-months {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 9px;
+    gap: 2px;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1;
+    height: 12px;
+}
+
+.gh-months span {
+    grid-row: 1;
     white-space: nowrap;
 }
 
-.device-cards td:last-child {
-    padding-left: 8px;
+.gh-heatmap {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 9px);
+    grid-auto-columns: 9px;
+    gap: 2px;
+}
+
+.gh-cell {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    background: var(--panel-soft);
+}
+.gh-cell[data-level="1"] { background: rgba(var(--accent-rgb), .22); }
+.gh-cell[data-level="2"] { background: rgba(var(--accent-rgb), .45); }
+.gh-cell[data-level="3"] { background: rgba(var(--accent-rgb), .70); }
+.gh-cell[data-level="4"] { background: rgb(var(--accent-rgb)); }
+
+.gh-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--muted);
+}
+.gh-legend span:first-child { margin-right: 4px; }
+.gh-legend span:last-child { margin-left: 4px; }
+
+.gh-empty {
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+/* ------------------------------------------------------------ rotation --
+   Доля считается внутри топа, а не от всех прослушиваний за неделю: общее
+   число last.fm по периоду не отдаёт, поэтому и подпись говорит «across N». */
+
+.rotation { margin-top: 20px; }
+
+.rotation-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    margin-bottom: 10px;
+}
+
+.rotation-title {
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: .04em;
+    white-space: nowrap;
+}
+
+.rotation-sub {
+    font-size: 11.5px;
+    color: var(--dim);
+    margin-left: auto;
+}
+
+.rotation-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: rot;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.rotation-list li {
+    counter-increment: rot;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 6px;
+    border-radius: 2px;
+    min-width: 0;
+    transition: background .15s ease;
+}
+.rotation-list li:hover { background: var(--panel-hover); }
+
+.rotation-list li::before {
+    content: counter(rot, decimal-leading-zero);
+    flex: 0 0 auto;
+    color: var(--faint);
+    font-size: 11.5px;
+}
+
+.rot-name {
+    font-size: 12.5px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* полоска длиной в долю артиста — единственный график на странице,
+   поэтому она тонкая и без подписей */
+.rot-bar {
+    flex: 0 0 120px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--panel-soft);
+    overflow: hidden;
+}
+.rot-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: rgba(var(--accent-rgb), .55);
+}
+.rotation-list li:first-child .rot-bar i { background: rgb(var(--accent-rgb)); }
+
+.rot-plays {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+}
+.rotation-list li:hover .rot-plays { color: var(--dim); }
+
+.rotation-note {
+    margin-top: 10px;
+    font-size: 11.5px;
+    color: var(--dim);
+}
+.rotation-note b {
+    font-weight: 400;
+    color: var(--accent);
+}
+
+/* ----------------------------------------------------------- guestbook --
+   Композер — единственная заливка в секции, поэтому глаз сразу идёт туда.
+   Поля внутри него прозрачные: рамок на сайте нет, границу поля рисует сам
+   блок. Записи ниже плоские, с подсветкой по наведению, как строки ротации. */
+
+.gb-composer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px 10px;
+    border-radius: var(--radius);
+    background: var(--panel-soft);
+    transition: box-shadow .15s ease, background .15s ease;
+}
+/* засечка загорается на весь блок, а не на отдельное поле */
+.gb-composer:focus-within {
+    background: var(--panel-hover);
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.gb-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.gb-prompt {
+    flex: 0 0 auto;
+    color: var(--accent);
+    font-size: 13px;
+    line-height: 1;
+}
+
+.gb-nickfield,
+.gb-bodyfield {
+    font: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: none;
+    border: 0;
+    outline: 0;
+    padding: 0;
+    min-width: 0;
+}
+.gb-nickfield { flex: 1 1 auto; }
+.gb-nickfield::placeholder { color: var(--dim); }
+
+/* высоту растит скрипт, поэтому ни ручки ресайза, ни скроллбара */
+.gb-bodyfield {
+    line-height: 1.55;
+    resize: none;
+    overflow: hidden;
+    min-height: 42px;
+}
+.gb-bodyfield::placeholder { color: var(--faint); }
+
+/* ловушка: убрана с экрана, но остаётся в разметке — её и заполняют боты */
+.gb-trap {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+/* Рожицы живут в одной строке со счётчиком и отправкой: слева набор,
+   справа действие. Сжимаются и переносятся внутри себя, если не влезают. */
+.gb-faces {
+    display: flex;
+    flex-wrap: wrap;
+    flex: 0 1 auto;
+    gap: 4px;
+    min-width: 0;
+}
+
+.gb-face {
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    padding: 4px 7px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.gb-face:hover {
+    background: var(--panel-hover);
+    color: var(--text);
+}
+.gb-face:focus-visible { outline: 1px solid var(--accent-line); }
+
+.gb-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-width: 0;
+}
+
+/* растягивается на свободное место и этим отжимает счётчик с кнопкой вправо */
+.gb-status {
+    flex: 1 1 auto;
+    font-size: 11.5px;
+    color: var(--muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.gb-status.bad { color: var(--accent); }
+
+/* счётчик идёт на убывание: важно, сколько осталось, а не сколько набрано */
+.gb-count {
+    margin-left: auto;
+    flex: 0 0 auto;
+    font-size: 11.5px;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+}
+.gb-count.low { color: var(--accent); }
+
+.gb-submit {
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--muted);
+    background: var(--panel-hover);
+    border: 0;
+    border-radius: var(--radius);
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.gb-submit:hover:not(:disabled) {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.gb-submit:disabled {
+    color: var(--faint);
+    cursor: default;
+}
+.gb-submit:focus-visible { outline: 1px solid var(--accent-line); }
+
+/* -------------------------------------------------------------- footer -- */
+
+footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 40px;
+    padding: 18px 0 48px;
+    border-top: 1px solid var(--line-soft);
+    color: var(--faint);
+    font-size: 12.5px;
+}
+
+/* Футер — одна живая строка: тихий // и фраза, которая меняется по кругу.
+   Это единственное акцентное пятно внизу страницы. */
+footer .quote {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+}
+
+.quote-mark {
+    flex: 0 0 auto;
+    color: var(--faint);
+}
+
+.quote-text {
+    color: var(--accent);
+    transition: opacity .25s ease;
+}
+.quote-text.swap { opacity: 0; }
+
+/* ---------------------------------------------------------- responsive -- */
+
+/* колонки схлопываются раньше остального: при 900px правой уже тесно */
+@media (max-width: 900px) {
+    .layout {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 30px;
+    }
+
+    /* боковая колонка растворяется, её панели встают в общую стопку */
+    .col-side { display: contents; }
+
+    /* в одну колонку огромный квадрат фото не нужен — кладём карточку в строку */
+    .card-id {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px;
+    }
+    /* 108, а не 88 как раньше: на телефоне фото единственная картинка в шапке,
+       и в прежнем размере оно выглядело обрезком */
+    .card-id .avatar { width: 108px; aspect-ratio: 1; }
+    .card-id-text { flex: 1 1 auto; }
+    /* ссылки не влезают в строку с именем и переносятся — по левому краю */
+    .card-id .nav { flex-basis: 100%; }
+
+    .col-side .links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+    body { padding-inline: 16px; }
+
+    /* карточке-герою на телефоне хватает меньшего радиуса и полей */
+    .panel.card { padding: 16px 16px 18px; border-radius: 14px; }
+
+    .gh-stats { gap: 10px 20px; }
+    .gh-stat .num { font-size: 17px; }
+
+    /* в одну колонку подпись не помещается рядом с заголовком */
+    .rotation-sub { margin-left: 0; flex-basis: 100%; }
+    .rot-bar { flex-basis: 70px; }
+
+    .gb-submit { min-height: 44px; padding-inline: 22px; }
+    /* пальцем в кнопку 22px не попасть */
+    .gb-face { min-height: 40px; padding: 4px 12px; flex: 0 0 auto; }
+    /* крупные кнопки в строку с отправкой не влезут, а тремя рядами занимают
+       пол-экрана — даём им одну строку с прокруткой, как у треков */
+    .gb-faces {
+        flex-wrap: nowrap;
+        flex-basis: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .gb-faces::-webkit-scrollbar { display: none; }
+
+    .shell { padding-block: 40px 0; }
+
+    .col-side .links,
+    .links { grid-template-columns: minmax(0, 1fr); }
+
+    .game-bar { grid-template-columns: minmax(0, 1fr); }
+    .game-lib { max-height: 220px; }
+
+    .scroll-btn { display: none; }
+    .scroll-rail { scroll-snap-type: x mandatory; }
+    .track { scroll-snap-align: start; }
+
+    footer { flex-direction: column; align-items: flex-start; gap: 6px; }
+}
+
+@media (max-width: 420px) {
+    .track { width: 205px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
 }

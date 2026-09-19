@@ -49,9 +49,12 @@ public class SteamAPIClientImpl implements SteamAPIClient {
 
     @Override
     public List<GOGSteamResponseDto> getAllGameLib() {
+        // include_played_free_games обязателен: без него Steam не отдаёт free-to-play
+        // игры, и недавно сыгранная F2P не находится в библиотеке при сшивке.
         String url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?" +
                 "key=" + token + "&" +
                 "steamid=" + id + "&" +
+                "include_played_free_games=1&" +
                 "format=json";
         List<GOGSteamResponseDto> games = new ArrayList<>();
         try {

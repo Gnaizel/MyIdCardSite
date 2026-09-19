@@ -2,13 +2,18 @@ package ru.gnaizel.mapper.music;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.gnaizel.dto.music.RotationDto;
+import ru.gnaizel.dto.music.TopArtistDto;
 import ru.gnaizel.dto.music.TrackDto;
 import ru.gnaizel.model.music.Image;
 import ru.gnaizel.model.music.LastFmResponse;
 import ru.gnaizel.model.music.PlayNow;
+import ru.gnaizel.model.music.TopArtist;
+import ru.gnaizel.model.music.TopArtistsResponse;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -53,5 +58,36 @@ public class LastFmMapper {
                             timeFromLastListen);
                 })
                 .collect(Collectors.toList());
+    }
+
+    public RotationDto mapToRotation(TopArtistsResponse response) {
+        if (response == null
+                || response.getTopArtists() == null
+                || response.getTopArtists().getArtist() == null) {
+            return null;
+        }
+
+        List<TopArtist> artists = response.getTopArtists().getArtist();
+        int total = artists.stream().mapToInt(artist -> plays(artist.getPlaycount())).sum();
+
+        List<TopArtistDto> top = new ArrayList<>();
+        for (TopArtist artist : artists) {
+            int plays = plays(artist.getPlaycount());
+            // доля от прослушиваний внутри топа: делить не на что, если он пуст
+            int share = total == 0 ? 0 : Math.round(plays * 100f / total);
+            top.add(new TopArtistDto(artist.getName(), plays, share));
+        }
+
+        return new RotationDto(top, total, top.size());
+    }
+
+    /** last.fm отдаёт playcount строкой и иногда пустой. */
+    private int plays(String playcount) {
+        try {
+            return playcount == null || playcount.isBlank() ? 0 : Integer.parseInt(playcount.trim());
+        } catch (NumberFormatException e) {
+            log.warn("LAST.FM: playcount is not a number: " + playcount);
+            return 0;
+        }
     }
 }
