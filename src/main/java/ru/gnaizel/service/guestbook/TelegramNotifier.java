@@ -2,16 +2,12 @@ package ru.gnaizel.service.guestbook;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 import ru.gnaizel.model.guestbook.Message;
+import ru.gnaizel.service.telegram.TelegramClient;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -34,9 +30,8 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class TelegramNotifier implements MessageNotifier {
-    private static final String API = "https://api.telegram.org/bot%s/sendMessage";
-
     /* Телеграм режет бота примерно на 20 сообщениях в минуту в один чат и
        дальше отвечает 429. Свой потолок ставим ниже — заодно это защита от
        флуда: если в книгу польётся поток, телефон не станет будильником. */
@@ -59,25 +54,19 @@ public class TelegramNotifier implements MessageNotifier {
             },
             (runnable, executor) -> log.warn("TELEGRAM: очередь переполнена, уведомление отброшено"));
 
-    private final RestTemplate template = timeoutedTemplate();
+    private final TelegramClient client;
 
     /* Трогает их только поток отправки, поэтому синхронизация не нужна. */
     private final Deque<Instant> recentlySent = new ArrayDeque<>();
     private boolean floodNoticeSent;
-
-    @Value("${telegram.bot-token:}")
-    private String botToken;
-
-    @Value("${telegram.chat-id:}")
-    private String chatId;
 
     @Value("${telegram.zone:UTC+4}")
     private String zone;
 
     @PostConstruct
     void announce() {
-        if (enabled()) {
-            log.info("TELEGRAM: уведомления включены, чат {}", chatId);
+        if (client.configured()) {
+            log.info("TELEGRAM: уведомления включены, чат {}", client.chatId());
         } else {
             log.warn("TELEGRAM: уведомления выключены — не заданы telegram.bot-token и/или telegram.chat-id");
         }
@@ -85,7 +74,7 @@ public class TelegramNotifier implements MessageNotifier {
 
     @Override
     public void onNewMessage(Message message) {
-        if (!enabled()) {
+        if (!client.configured()) {
             return;
         }
         String text = render(message);
@@ -105,11 +94,6 @@ public class TelegramNotifier implements MessageNotifier {
         }
     }
 
-    private boolean enabled() {
-        return botToken != null && !botToken.isBlank()
-                && chatId != null && !chatId.isBlank();
-    }
-
     /* Всё, что ниже, выполняется на потоке отправки. */
 
     private void send(String text, Long id) {
@@ -127,28 +111,11 @@ public class TelegramNotifier implements MessageNotifier {
     }
 
     private void post(String text) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        Map<String, Object> payload = Map.of(
-                "chat_id", chatId,
+        client.call("sendMessage", Map.of(
+                "chat_id", client.chatId(),
                 "text", text,
                 "parse_mode", "HTML",
-                "disable_web_page_preview", true);
-        try {
-            template.postForEntity(API.formatted(botToken), new HttpEntity<>(payload, headers), String.class);
-        } catch (RestClientException e) {
-            /* RestTemplate вписывает в текст ошибки весь url, а в url лежит
-               токен — без вырезания он оседает в логах контейнера, которые
-               защищены куда хуже, чем .env с правами 600. */
-            log.error("TELEGRAM SEND ERROR: {}", withoutToken(e.getMessage()));
-        }
-    }
-
-    private String withoutToken(String text) {
-        if (text == null) {
-            return "";
-        }
-        return botToken.isBlank() ? text : text.replace(botToken, "***");
+                "disable_web_page_preview", true));
     }
 
     private boolean withinLimit() {
@@ -185,14 +152,5 @@ public class TelegramNotifier implements MessageNotifier {
         return value.replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;");
-    }
-
-    /* У RestTemplate по умолчанию таймаутов нет вообще: подвисший телеграм
-       намертво занял бы единственный поток отправки. */
-    private static RestTemplate timeoutedTemplate() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(5));
-        factory.setReadTimeout(Duration.ofSeconds(10));
-        return new RestTemplate(factory);
     }
 }
