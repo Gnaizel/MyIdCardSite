@@ -1,6 +1,7 @@
 package ru.gnaizel.mapper.game;
 
 import lombok.extern.slf4j.Slf4j;
+import ru.gnaizel.dto.games.FortniteStatsDto;
 import ru.gnaizel.dto.games.GOGSteamResponseDto;
 import ru.gnaizel.dto.games.GameDto;
 import ru.gnaizel.model.games.Game;
@@ -50,6 +51,25 @@ public class GameMapper {
             return hours + "h";
         }
         return hours + "h " + remMinutes + "m";
+    }
+
+    /* Fortnite приходит не из Steam, поэтому ни appid, ни картинок у него нет:
+       название и изображения задаются настройками. В остальном это такая же
+       строка списка — часы и время последнего запуска на своих местах. */
+    public static Game fortniteToGame(FortniteStatsDto stats, String name, String icon, String banner) {
+        LocalDateTime lastPlayed = LocalDateTime.ofInstant(stats.getLastModified(), ZoneId.of("UTC+4"));
+
+        Game game = new Game();
+        game.setAppid(0);
+        game.setPlaytime_2weeks(0);
+        game.setPlaytime_forever(stats.getMinutesPlayed());
+        game.setPlaytime_windows_forever(stats.getMinutesPlayed());
+        game.setName(name);
+        game.setImg_icon_url(icon);
+        game.setBanner_url(banner);
+        game.setRtime_last_played(lastPlayed);
+        game.setPlaytime_disconnected(0);
+        return game;
     }
 
     public static Game gogDtoToGame(GOGSteamResponseDto gog) {

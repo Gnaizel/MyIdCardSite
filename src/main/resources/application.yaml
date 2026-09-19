@@ -34,6 +34,23 @@ steam:
   # в Steam не заходили месяцами.
   recent-limit: ${STEAM_RECENT_LIMIT:12}
 
+fortnite:
+  # Своего API для библиотеки у Epic нет — это подтверждал сотрудник Epic
+  # на их форуме. Но статистика по отдельной игре доступна через
+  # fortnite-api.com, и Fortnite встаёт в общий список играми наравне
+  # со Steam. Ключ бесплатный: https://dash.fortnite-api.com/
+  api-key: ${FORTNITE_API_KEY:}
+  # Ник в Epic. Пустой — блок Fortnite просто не появляется.
+  # Статистика должна быть открыта в самой игре: Career -> приватность ->
+  # показывать в таблице лидеров, иначе сервис ответит отказом.
+  name: ${FORTNITE_NAME:}
+  account-type: ${FORTNITE_ACCOUNT_TYPE:epic}
+  # Как подписать игру и чем её проиллюстрировать: в Steam картинки берутся
+  # по appid, а у Fortnite его нет.
+  title: ${FORTNITE_TITLE:Fortnite}
+  icon: ${FORTNITE_ICON:/image/game-icon.jpg}
+  banner: ${FORTNITE_BANNER:/image/game-icon.jpg}
+
 guestbook:
   # Пока ключ пустой, админские ручки закрыты наглухо и отвечают 401.
   # Любая длинная случайная строка, передаётся заголовком X-Admin-Key.

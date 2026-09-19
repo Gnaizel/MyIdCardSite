@@ -25,6 +25,8 @@ copy .env.example .env    # один раз, потом впиши ключи
 | `STEAM_API_TOKEN` | игры: `/games`, `/games-total-hours` | [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey) |
 | `STEAM_IDS` | тот же блок игр, можно несколько аккаунтов | [steamid.io](https://steamid.io) — нужен SteamID64 |
 | `GITHUB_TOKEN` | календарь коммитов: `/github` | [github.com/settings/tokens](https://github.com/settings/tokens) |
+| `FORTNITE_API_KEY` | часы и статистика Fortnite в блоке игр | [dash.fortnite-api.com](https://dash.fortnite-api.com/) |
+| `FORTNITE_NAME` | тот же блок: ник в Epic | свой ник |
 | `GUESTBOOK_ADMIN_KEY` | модерация гостевой книги | придумай сам |
 | `TELEGRAM_BOT_TOKEN` | бот шлёт в телеграм всё, что пишут в книгу | [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_CHAT_ID` | тот же бот: кому слать | см. ниже |
@@ -54,6 +56,26 @@ STEAM_IDS=76561198000000001,76561198000000002
 выдаётся разработчику, а не профилю, и работает с любым публичным профилем.
 Аккаунт с закрытым профилем просто не попадёт в сумму, в логе будет строка
 `STEAM: аккаунт ... не отдал ничего`.
+
+### Fortnite
+
+У Epic нет открытого API для библиотеки: на их форуме сотрудник Epic ответил
+прямо — «we do not offer or expose an API for these specific items». Списка
+купленных игр и часов по ним получить неоткуда.
+
+Но статистика по отдельной игре доступна через
+[fortnite-api.com](https://fortnite-api.com/). Ключ бесплатный, берётся на
+[dash.fortnite-api.com](https://dash.fortnite-api.com/). Fortnite встаёт
+в общий список игр наравне со Steam: часы, дата последнего запуска, общая
+сумма часов.
+
+**Статистика должна быть открыта в самой игре**: Career → настройки
+приватности → показывать в таблице лидеров. Иначе сервис отвечает отказом
+даже с верным ключом — чужую закрытую статистику он не отдаёт. В логе это
+видно строкой `FORTNITE: статистика закрыта настройками профиля`.
+
+Картинку игры задают `FORTNITE_ICON` и `FORTNITE_BANNER`: у Steam они
+берутся по appid, а у Fortnite его нет.
 
 ### GitHub
 
