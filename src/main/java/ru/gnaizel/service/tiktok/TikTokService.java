@@ -18,4 +18,11 @@ public interface TikTokService {
      * Нужен только проксирующей ручке: наружу этот адрес не отдаётся.
      */
     Optional<String> playAddr(String id);
+
+    /**
+     * Настоящий адрес звуковой дорожки фото-поста. Нужен той же
+     * проксирующей ручке и по той же причине: TikTok отдаёт её только
+     * при Referer со своего домена.
+     */
+    Optional<String> musicAddr(String id);
 }

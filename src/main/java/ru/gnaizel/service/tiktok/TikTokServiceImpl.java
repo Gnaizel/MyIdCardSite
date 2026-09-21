@@ -36,7 +36,12 @@ import java.util.Optional;
 @Service
 public class TikTokServiceImpl implements TikTokService {
     private static final String REPOSTS_URL =
-            "https://www.tiktok.com/api/repost/item_list/?aid=1988&secUid=%s&count=%d&cursor=0";
+            "https://www.tiktok.com/api/repost/item_list/?aid=1988&secUid=%s&count=%d&cursor=%s";
+
+    /* За раз TikTok отдаёт не больше трёх десятков: на count=50 он отвечает
+       пустым списком. Поэтому за длинным списком ходим страницами. */
+    private static final int PAGE = 30;
+    private static final int MAX_PAGES = 5;
 
     /* Обложки подписаны и живут около двух суток. Час — с большим запасом:
        к моменту, когда ссылка протухнет, мы сходим за списком десятки раз. */
@@ -58,7 +63,7 @@ public class TikTokServiceImpl implements TikTokService {
     @Value("${tiktok.username:}")
     private String username;
 
-    @Value("${tiktok.limit:9}")
+    @Value("${tiktok.limit:30}")
     private int limit;
 
     @Override
@@ -70,7 +75,7 @@ public class TikTokServiceImpl implements TikTokService {
             return cached;
         }
 
-        List<TikTokVideoDto> fresh = fetch();
+        List<TikTokVideoDto> fresh = fetchAll();
         /* Пустым ответом непустой список не затираем: TikTok мог просто
            моргнуть, а блок на странице из-за этого исчез бы целиком. */
         if (!fresh.isEmpty() || cached.isEmpty()) {
@@ -82,59 +87,123 @@ public class TikTokServiceImpl implements TikTokService {
 
     @Override
     public Optional<String> playAddr(String id) {
-        /* Ищем по уже полученному списку, а не принимаем адрес снаружи:
-           иначе ручка превратилась бы в открытый прокси, которым можно
-           ходить куда угодно от имени сервера. */
-        return getReposts().stream()
-                .filter(video -> video.getId().equals(id))
-                .map(TikTokVideoDto::getPlayAddr)
-                .filter(addr -> addr != null && !addr.isBlank())
-                .findFirst();
+        return find(id).map(TikTokVideoDto::getPlayAddr).filter(TikTokServiceImpl::filled);
     }
 
-    private List<TikTokVideoDto> fetch() {
+    @Override
+    public Optional<String> musicAddr(String id) {
+        return find(id).map(TikTokVideoDto::getMusicAddr).filter(TikTokServiceImpl::filled);
+    }
+
+    /* Ищем по уже полученному списку, а не принимаем адрес снаружи: иначе
+       проксирующая ручка превратилась бы в открытый прокси, которым можно
+       ходить куда угодно от имени сервера. */
+    private Optional<TikTokVideoDto> find(String id) {
+        return getReposts().stream().filter(video -> video.getId().equals(id)).findFirst();
+    }
+
+    private static boolean filled(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private List<TikTokVideoDto> fetchAll() {
+        List<TikTokVideoDto> all = new ArrayList<>();
+        String cursor = "0";
+
+        for (int page = 0; page < MAX_PAGES && all.size() < limit; page++) {
+            JsonNode body = fetchPage(cursor);
+            if (body == null) {
+                break;
+            }
+            for (JsonNode item : body.path("itemList")) {
+                parse(item).ifPresent(all::add);
+                if (all.size() >= limit) {
+                    break;
+                }
+            }
+            if (!body.path("hasMore").asBoolean()) {
+                break;
+            }
+            cursor = body.path("cursor").asText("0");
+        }
+
+        log.info("TIKTOK: получено репостов: {}", all.size());
+        return List.copyOf(all);
+    }
+
+    private JsonNode fetchPage(String cursor) {
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.USER_AGENT, UA);
         headers.set(HttpHeaders.REFERER, "https://www.tiktok.com/@" + username);
 
-        JsonNode body;
         try {
             ResponseEntity<JsonNode> response = template.exchange(
-                    REPOSTS_URL.formatted(secUid, limit), HttpMethod.GET,
+                    REPOSTS_URL.formatted(secUid, PAGE, cursor), HttpMethod.GET,
                     new HttpEntity<>(headers), JsonNode.class);
-            body = response.getBody();
+            JsonNode body = response.getBody();
+            if (body == null || !body.has("itemList")) {
+                log.warn("TIKTOK: в ответе нет списка — похоже, ручка изменилась");
+                return null;
+            }
+            return body;
         } catch (RestClientException e) {
             log.warn("TIKTOK: не забрал репосты: {}", e.getMessage());
-            return List.of();
+            return null;
+        }
+    }
+
+    /* Репосты бывают двух видов, и различать их обязательно: у фото-поста
+       нет видео вовсе, зато есть несколько кадров и отдельная дорожка —
+       раньше от него показывалась одна обложка и без звука. */
+    private Optional<TikTokVideoDto> parse(JsonNode item) {
+        String id = item.path("id").asText(null);
+        String author = item.path("author").path("uniqueId").asText(null);
+        if (id == null || author == null) {
+            return Optional.empty();
         }
 
-        if (body == null || !body.has("itemList")) {
-            log.warn("TIKTOK: в ответе нет списка — похоже, ручка изменилась");
-            return List.of();
+        List<String> images = images(item);
+        String cover = images.isEmpty()
+                ? item.path("video").path("cover").asText(null)
+                : images.get(0);
+        if (cover == null) {
+            return Optional.empty();
         }
 
-        List<TikTokVideoDto> videos = new ArrayList<>();
-        for (JsonNode item : body.path("itemList")) {
-            String id = item.path("id").asText(null);
-            String author = item.path("author").path("uniqueId").asText(null);
-            String cover = item.path("video").path("cover").asText(null);
-            if (id == null || author == null || cover == null) {
-                continue;
+        TikTokVideoDto.TikTokVideoDtoBuilder video = TikTokVideoDto.builder()
+                .id(id)
+                .url("https://www.tiktok.com/@%s/video/%s".formatted(author, id))
+                .cover(cover)
+                .description(item.path("desc").asText(""))
+                .author(author)
+                .images(images);
+
+        if (images.isEmpty()) {
+            video.videoUrl("/tiktok/video/" + id)
+                    .playAddr(item.path("video").path("playAddr").asText(null));
+        } else {
+            String music = item.path("music").path("playUrl").asText(null);
+            if (filled(music)) {
+                video.audioUrl("/tiktok/audio/" + id).musicAddr(music);
             }
-            videos.add(new TikTokVideoDto(
-                    id,
-                    "https://www.tiktok.com/@%s/video/%s".formatted(author, id),
-                    cover,
-                    item.path("desc").asText(""),
-                    author,
-                    "/tiktok/video/" + id,
-                    item.path("video").path("playAddr").asText(null)));
-            if (videos.size() >= limit) {
-                break;
+            video.musicTitle(item.path("music").path("title").asText(""));
+        }
+        return Optional.of(video.build());
+    }
+
+    private List<String> images(JsonNode item) {
+        JsonNode post = item.path("imagePost").path("images");
+        if (!post.isArray() || post.isEmpty()) {
+            return List.of();
+        }
+        List<String> urls = new ArrayList<>();
+        for (JsonNode image : post) {
+            JsonNode list = image.path("imageURL").path("urlList");
+            if (list.isArray() && !list.isEmpty()) {
+                urls.add(list.get(0).asText());
             }
         }
-        log.info("TIKTOK: получено репостов: {}", videos.size());
-        return List.copyOf(videos);
+        return List.copyOf(urls);
     }
 
     /* Ответ у этой ручки на полмегабайта, и приходит он не мгновенно —

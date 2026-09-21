@@ -97,7 +97,7 @@ tiktok:
   # Пустой — блок не появляется вовсе.
   sec-uid: ${TIKTOK_SEC_UID:}
   # Сколько видео показывать.
-  limit: ${TIKTOK_LIMIT:9}
+  limit: ${TIKTOK_LIMIT:30}
 
 github:
   login: ${GITHUB_LOGIN:Gnaizel}

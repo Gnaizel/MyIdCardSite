@@ -664,34 +664,74 @@ function initGuestbook() {
 initGuestbook();
 
 /* --------------------------------------------------------------- tiktok --
-   Лента репостов: одно видео на экран, следующее — прокруткой вниз.
-   Перелистывание делает нативный scroll-snap в CSS, здесь только
-   воспроизведение: играет то, что видно, остальные стоят на паузе. */
+   Лента репостов: один пост на экран, следующий — прокруткой вниз.
+   Постов два вида, и ведут они себя по-разному: обычное видео и фото-пост,
+   где кадры листаются вбок под свою звуковую дорожку.
+
+   Перелистывание по обеим осям делает нативный scroll-snap в CSS, здесь
+   только воспроизведение: играет то, что видно, остальное на паузе. */
 
 let tiktokMuted = true;
+
+function tiktokMedia(item) {
+    return item.querySelector('video') || item.querySelector('audio');
+}
+
+function buildVideoPost(video) {
+    return `<video preload="none" loop playsinline muted poster="${esc(video.cover)}"` +
+        ` src="${esc(video.videoUrl)}"></video>` +
+        `<img class="poster" src="${esc(video.cover)}" alt="" loading="lazy">`;
+}
+
+function buildPhotoPost(video) {
+    const frames = video.images.map(src =>
+        `<img src="${esc(src)}" alt="" loading="lazy">`).join('');
+    const dots = video.images.map((_, i) =>
+        `<i${i === 0 ? ' class="on"' : ''}></i>`).join('');
+    /* Звук у фото-поста отдельной дорожкой: видео тут нет вовсе, и без
+       этого пост показывался немой картинкой. */
+    const audio = video.audioUrl
+        ? `<audio preload="none" loop src="${esc(video.audioUrl)}"></audio>` : '';
+    return `<div class="tiktok-photos">${frames}</div>` +
+        `<div class="tiktok-dots">${dots}</div>` + audio;
+}
 
 function buildTikTokItem(video, index, total) {
     const item = document.createElement('div');
     item.className = 'tiktok-item';
+    const photos = video.images && video.images.length > 1;
+
     item.innerHTML =
-        `<video preload="none" loop playsinline muted poster="${esc(video.cover)}"` +
-        ` src="${esc(video.videoUrl)}"></video>` +
-        `<img class="poster" src="${esc(video.cover)}" alt="" loading="lazy">` +
+        (video.images && video.images.length ? buildPhotoPost(video) : buildVideoPost(video)) +
         `<button class="tiktok-sound" type="button">sound on</button>` +
         `<div class="tiktok-meta">` +
         `<a href="${esc(video.url)}" target="_blank" rel="noopener">@${esc(video.author)}</a>` +
         `<span class="tiktok-count">${index + 1}/${total}</span>` +
         `</div>`;
 
-    const media = item.querySelector('video');
-    /* Обложку убираем только когда картинка реально пошла: до этого
-       у video пустой чёрный кадр, и перелистывание выглядит как провал. */
-    media.addEventListener('loadeddata', () => item.classList.add('ready'));
+    const media = tiktokMedia(item);
+
+    const poster = item.querySelector('.poster');
+    if (poster && media) {
+        /* Обложку убираем только когда картинка реально пошла: до этого
+           у video пустой чёрный кадр, и перелистывание выглядит как провал. */
+        media.addEventListener('loadeddata', () => item.classList.add('ready'));
+    }
+
+    if (photos) {
+        // точки должны показывать, на каком кадре стоишь
+        const rail = item.querySelector('.tiktok-photos');
+        const dots = item.querySelectorAll('.tiktok-dots i');
+        rail.addEventListener('scroll', () => {
+            const at = Math.round(rail.scrollLeft / rail.clientWidth);
+            dots.forEach((dot, i) => dot.classList.toggle('on', i === at));
+        }, { passive: true });
+    }
 
     item.querySelector('.tiktok-sound').addEventListener('click', event => {
         event.stopPropagation();
         tiktokMuted = !tiktokMuted;
-        document.querySelectorAll('.tiktok-item video').forEach(other => {
+        document.querySelectorAll('.tiktok-item video, .tiktok-item audio').forEach(other => {
             other.muted = tiktokMuted;
         });
         document.querySelectorAll('.tiktok-sound').forEach(button => {
@@ -699,10 +739,13 @@ function buildTikTokItem(video, index, total) {
         });
     });
 
-    // тап по кадру — пауза, как везде
-    media.addEventListener('click', () => {
-        if (media.paused) media.play().catch(() => {}); else media.pause();
-    });
+    if (media) {
+        // тап по кадру — пауза, как везде
+        item.addEventListener('click', event => {
+            if (event.target.closest('a, button')) return;
+            if (media.paused) media.play().catch(() => {}); else media.pause();
+        });
+    }
 
     return item;
 }
@@ -722,17 +765,17 @@ function displayTikTok(videos) {
     videos.forEach((video, index) => feed.appendChild(buildTikTokItem(video, index, videos.length)));
     section.hidden = false;
 
-    /* Грузим и играем только то, что на экране: иначе девять роликов
+    /* Грузим и играем только то, что на экране: иначе три десятка роликов
        полезли бы качаться разом, все через наш сервер. */
     const watcher = new IntersectionObserver(entries => {
         entries.forEach(entry => {
-            const media = entry.target.querySelector('video');
+            const media = tiktokMedia(entry.target);
             if (!media) return;
             if (entry.isIntersecting) {
                 media.muted = tiktokMuted;
                 media.play().catch(() => {
                     /* автовоспроизведение могут запретить — тогда останется
-                       обложка и тап по кадру, это рабочее состояние */
+                       картинка и тап по кадру, это рабочее состояние */
                 });
             } else {
                 media.pause();

@@ -34,25 +34,36 @@ public class TikTokController {
         return tikTokService.getReposts();
     }
 
-    /**
-     * Видео проксируется через нас, а не играется с адреса TikTok напрямую.
-     * <p>
-     * Причина не в красоте: TikTok отдаёт файл только при Referer со своего
-     * домена. Тег video на нашей странице пришлёт наш домен и получит 403 —
-     * проверено. Поэтому запрос повторяем отсюда, с нужными заголовками.
-     * <p>
-     * Заодно наружу не уезжает подписанный адрес, который всё равно протухает
-     * через двое суток.
-     */
     @GetMapping("/tiktok/video/{id}")
     public ResponseEntity<StreamingResponseBody> video(
             @PathVariable String id,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String range) {
+        return proxy(tikTokService.playAddr(id), range, "видео " + id);
+    }
 
+    /** Звук фото-поста: у него нет видео, но есть своя дорожка. */
+    @GetMapping("/tiktok/audio/{id}")
+    public ResponseEntity<StreamingResponseBody> audio(
+            @PathVariable String id,
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) String range) {
+        return proxy(tikTokService.musicAddr(id), range, "звук " + id);
+    }
+
+    /**
+     * Медиа проксируется через нас, а не играется с адреса TikTok напрямую.
+     * <p>
+     * Причина не в красоте: TikTok отдаёт файл только при Referer со своего
+     * домена. Теги video и audio на нашей странице пришлют наш домен
+     * и получат 403 — проверено и на видео, и на звуке. Поэтому запрос
+     * повторяется отсюда, с нужными заголовками.
+     * <p>
+     * Заодно наружу не уезжает подписанный адрес, который всё равно
+     * протухает через двое суток.
+     */
+    private ResponseEntity<StreamingResponseBody> proxy(Optional<String> source, String range, String what) {
         /* Адрес берётся из нашего же списка по id, а не принимается снаружи:
            иначе ручка стала бы открытым прокси, которым можно ходить куда
            угодно от имени сервера. */
-        Optional<String> source = tikTokService.playAddr(id);
         if (source.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -71,13 +82,13 @@ public class TikTokController {
             upstream.setReadTimeout(20000);
             status = upstream.getResponseCode();
         } catch (IOException e) {
-            log.warn("TIKTOK: не открыл видео {}: {}", id, e.getMessage());
+            log.warn("TIKTOK: не открыл {}: {}", what, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
 
         if (status >= 400) {
             upstream.disconnect();
-            log.warn("TIKTOK: видео {} отдано с отказом {}", id, status);
+            log.warn("TIKTOK: {} отдано с отказом {}", what, status);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
 
@@ -86,8 +97,8 @@ public class TikTokController {
         copy(upstream, headers, HttpHeaders.CONTENT_LENGTH);
         copy(upstream, headers, HttpHeaders.CONTENT_RANGE);
         copy(upstream, headers, HttpHeaders.ACCEPT_RANGES);
-        /* Приватный кэш: ролики одни и те же при прокрутке туда-сюда, но
-           на общих прокси им делать нечего — ссылка всё равно протухнет. */
+        /* Приватный кэш: одно и то же при прокрутке туда-сюда, но на общих
+           прокси ему делать нечего — ссылка всё равно протухнет. */
         headers.setCacheControl(CacheControl.maxAge(Duration.ofMinutes(30)).cachePrivate());
 
         StreamingResponseBody body = out -> {
@@ -96,7 +107,7 @@ public class TikTokController {
             } catch (IOException e) {
                 /* Обычное дело: посетитель пролистнул дальше или закрыл
                    вкладку посреди загрузки. Это не ошибка сервера. */
-                log.debug("TIKTOK: поток видео {} оборван: {}", id, e.getMessage());
+                log.debug("TIKTOK: поток ({}) оборван: {}", what, e.getMessage());
             } finally {
                 upstream.disconnect();
             }

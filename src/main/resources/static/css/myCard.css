@@ -810,10 +810,12 @@ h2.playtime .num { color: var(--text); }
    сами и одинаково. */
 
 .tiktok-feed {
-    /* Высота ровно под один кадр 9:16 — именно она превращает прокрутку
-       в перелистывание: следующее видео начинается за краем окна. */
-    aspect-ratio: 9 / 16;
-    max-height: 60vh;
+    /* Фиксированная высота, а не 9:16 от ширины: при колонке в 290px полный
+       кадр занимал бы больше пятисот пикселей и выдавливал всё остальное.
+       Кадр обрезается по краям (object-fit: cover), зато блок соразмерен
+       соседям. Именно высота и превращает прокрутку в перелистывание:
+       следующий пост начинается за краем окна. */
+    height: 340px;
     overflow-y: auto;
     scroll-snap-type: y mandatory;
     border-radius: var(--radius-tile);
@@ -866,6 +868,49 @@ h2.playtime .num { color: var(--text); }
     color: var(--dim);
     font-variant-numeric: tabular-nums;
 }
+
+/* Фото-пост: кадры листаются вбок, как в оригинале. Прилипание опять
+   нативное, только по другой оси — вложенный горизонтальный скролл внутри
+   вертикальной ленты работает сам, без перехвата жестов. */
+.tiktok-photos {
+    display: flex;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+}
+.tiktok-photos::-webkit-scrollbar { display: none; }
+
+.tiktok-photos img {
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+}
+
+/* Точки: сколько кадров и какой сейчас. Без них непонятно, что пост вообще
+   листается вбок — в ленте это единственная подсказка. */
+.tiktok-dots {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    pointer-events: none;
+}
+.tiktok-dots i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .35);
+    transition: background .2s ease;
+}
+.tiktok-dots i.on { background: #fff; }
 
 /* Звук выключен по умолчанию — иначе страница заговорит сама. Кнопка
    в углу, чтобы включить осознанно. */
