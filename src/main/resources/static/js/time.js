@@ -680,7 +680,11 @@ function tiktokMedia(item) {
 }
 
 function buildVideoPost(video) {
-    return `<video preload="none" loop playsinline muted poster="${esc(video.cover)}"` +
+    /* Подложка — размытая копия обложки. Вертикальные среди репостов
+       в меньшинстве: есть квадратные, 4:3 и горизонтальные, и без неё
+       кадр приходилось бы обрезать. */
+    return `<img class="backdrop" src="${esc(video.cover)}" alt="" aria-hidden="true">` +
+        `<video preload="none" loop playsinline muted poster="${esc(video.cover)}"` +
         ` src="${esc(video.videoUrl)}"></video>` +
         `<img class="poster" src="${esc(video.cover)}" alt="" loading="lazy">`;
 }
@@ -698,7 +702,8 @@ function buildPhotoPost(video) {
         ? `<button class="tiktok-arrow prev" type="button" aria-label="previous frame">&lsaquo;</button>` +
           `<button class="tiktok-arrow next" type="button" aria-label="next frame">&rsaquo;</button>`
         : '';
-    return `<div class="tiktok-photos">${frames}</div>` +
+    return `<img class="backdrop" src="${esc(video.cover)}" alt="" aria-hidden="true">` +
+        `<div class="tiktok-photos">${frames}</div>` +
         `<div class="tiktok-dots">${dots}</div>` + arrows + audio;
 }
 
@@ -841,8 +846,11 @@ function displayTikTok(videos) {
     toggle.addEventListener('click', () => {
         tiktokOpen = !tiktokOpen;
         wrap.classList.toggle('expanded', tiktokOpen);
-        toggle.textContent = tiktokOpen ? 'collapse' : 'expand';
+        /* Текста у кнопки нет — шеврон переворачивается через CSS
+           по aria-expanded, так что состояние и рисуется, и озвучивается
+           одним и тем же атрибутом. */
         toggle.setAttribute('aria-expanded', String(tiktokOpen));
+        toggle.setAttribute('aria-label', tiktokOpen ? 'hide reposts' : 'show reposts');
 
         if (tiktokOpen) {
             // первый пост уже на экране — наблюдатель сам его не дёрнет

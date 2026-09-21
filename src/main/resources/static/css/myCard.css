@@ -832,22 +832,29 @@ h2.playtime .num { color: var(--text); }
 }
 .tiktok-wrap.expanded::after { opacity: 0; }
 
+/* Шеврон вместо слова: надпись в узкой колонке занимала целую строку
+   и звучала как команда, а уголок читается сам. Развернули — он
+   переворачивается. */
 .tiktok-toggle {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
-    margin-top: 6px;
-    padding: 5px;
-    border: 1px solid var(--line-soft);
-    border-radius: var(--radius);
+    margin-top: 4px;
+    padding: 4px;
+    border: 0;
     background: none;
     color: var(--dim);
-    font: inherit;
-    font-size: 11.5px;
-    letter-spacing: .04em;
     cursor: pointer;
-    transition: color .15s ease, border-color .15s ease;
+    transition: color .15s ease;
 }
-.tiktok-toggle:hover { color: var(--accent); border-color: var(--accent-line); }
+.tiktok-toggle:hover { color: var(--accent); }
+.tiktok-toggle svg {
+    width: 18px;
+    height: 18px;
+    transition: transform .35s ease;
+}
+.tiktok-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 
 .tiktok-feed {
     /* Полный формат вертикального видео вернулся: кадр не обрезается,
@@ -869,11 +876,31 @@ h2.playtime .num { color: var(--text); }
     overflow: hidden;
 }
 
-.tiktok-item video,
-.tiktok-item .poster {
+/* Размытая подложка под кадром. Из репостов вертикальные — меньше половины:
+   есть квадратные, 4:3 и даже горизонтальные. С object-fit: cover квадрат
+   резался по бокам до узкой полоски, а горизонтальное видео превращалось
+   в кашу. Поэтому кадр показывается целиком (contain), а пустота вокруг
+   закрывается размытой копией — ровно как в самом TikTok. */
+.tiktok-item .backdrop {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    filter: blur(22px) saturate(.7) brightness(.45);
+    /* Небольшое увеличение прячет размытые края, которые иначе светятся
+       по периметру. */
+    transform: scale(1.15);
+    z-index: 0;
+}
+
+.tiktok-item video,
+.tiktok-item .poster {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     display: block;
 }
 
@@ -891,6 +918,8 @@ h2.playtime .num { color: var(--text); }
    скролл внутри вертикального scroll-snap перехватывается родителем,
    а мышью вбок вообще не покрутить. Поэтому листают стрелки и тап по краю. */
 .tiktok-photos {
+    position: relative;
+    z-index: 1;
     display: flex;
     height: 100%;
     overflow-x: auto;
@@ -904,7 +933,8 @@ h2.playtime .num { color: var(--text); }
     flex: 0 0 100%;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    /* кадры фото-постов тоже бывают не 9:16 — показываем целиком */
+    object-fit: contain;
     scroll-snap-align: center;
     scroll-snap-stop: always;
 }
