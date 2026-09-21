@@ -804,21 +804,57 @@ h2.playtime .num { color: var(--text); }
 .game:hover .game-info .playtime-forever { color: var(--dim); }
 
 /* -------------------------------------------------------------- tiktok --
-   Лента как в самом TikTok: одно видео на всю ширину колонки, следующее —
-   прокруткой вниз. Прилипание делает нативный scroll-snap, поэтому здесь
-   нет ни одного обработчика жестов: колесо, палец и клавиатура работают
-   сами и одинаково. */
+   Лента как в самом TikTok: один пост на кадр, следующий — прокруткой вниз.
+   Свёрнута по умолчанию: наружу торчит верхушка первого поста, чтобы было
+   видно, что блок разворачивается и там что-то есть. */
+
+.tiktok-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-tile);
+    /* max-height, а не height: только её можно плавно анимировать, а высота
+       развёрнутого состояния зависит от ширины колонки и заранее неизвестна. */
+    max-height: 96px;
+    transition: max-height .35s ease;
+}
+.tiktok-wrap.expanded { max-height: 900px; }
+
+/* Затемнение по нижнему краю: показывает, что кадр обрезан, а не кончился.
+   В развёрнутом виде оно не нужно и мешало бы подписи. */
+.tiktok-wrap::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 48px;
+    background: linear-gradient(to top, var(--bg), transparent);
+    pointer-events: none;
+    transition: opacity .35s ease;
+}
+.tiktok-wrap.expanded::after { opacity: 0; }
+
+.tiktok-toggle {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 5px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    background: none;
+    color: var(--dim);
+    font: inherit;
+    font-size: 11.5px;
+    letter-spacing: .04em;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+}
+.tiktok-toggle:hover { color: var(--accent); border-color: var(--accent-line); }
 
 .tiktok-feed {
-    /* Фиксированная высота, а не 9:16 от ширины: при колонке в 290px полный
-       кадр занимал бы больше пятисот пикселей и выдавливал всё остальное.
-       Кадр обрезается по краям (object-fit: cover), зато блок соразмерен
-       соседям. Именно высота и превращает прокрутку в перелистывание:
-       следующий пост начинается за краем окна. */
-    height: 340px;
+    /* Полный формат вертикального видео вернулся: кадр не обрезается,
+       а блок не занимает полколонки, потому что свёрнут. */
+    aspect-ratio: 9 / 16;
     overflow-y: auto;
     scroll-snap-type: y mandatory;
-    border-radius: var(--radius-tile);
     background: var(--panel-soft);
     /* полоса прокрутки тут только мешает: перелистывание и так очевидно */
     scrollbar-width: none;
@@ -850,28 +886,10 @@ h2.playtime .num { color: var(--text); }
 }
 .tiktok-item.ready .poster { opacity: 0; }
 
-/* Подпись поверх нижнего края: автор и ссылка на оригинал. */
-.tiktok-meta {
-    position: absolute;
-    inset: auto 0 0 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 24px 10px 8px;
-    background: linear-gradient(to top, rgba(0,0,0,.8), transparent);
-    font-size: 11.5px;
-}
-.tiktok-meta a { color: var(--text); }
-.tiktok-meta a:hover { color: var(--accent); }
-.tiktok-count {
-    margin-left: auto;
-    color: var(--dim);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Фото-пост: кадры листаются вбок, как в оригинале. Прилипание опять
-   нативное, только по другой оси — вложенный горизонтальный скролл внутри
-   вертикальной ленты работает сам, без перехвата жестов. */
+/* Фото-пост: кадры листаются вбок. Нативная прокрутка тут оставлена как
+   запасной путь, но полагаться на неё нельзя — вложенный горизонтальный
+   скролл внутри вертикального scroll-snap перехватывается родителем,
+   а мышью вбок вообще не покрутить. Поэтому листают стрелки и тап по краю. */
 .tiktok-photos {
     display: flex;
     height: 100%;
@@ -891,6 +909,29 @@ h2.playtime .num { color: var(--text); }
     scroll-snap-stop: always;
 }
 
+.tiktok-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    border: 0;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    background: rgba(0, 0, 0, .55);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: .75;
+    transition: opacity .15s ease, color .15s ease;
+}
+.tiktok-arrow:hover { opacity: 1; color: var(--accent); }
+.tiktok-arrow[disabled] { opacity: .2; cursor: default; }
+.tiktok-arrow.prev { left: 6px; }
+.tiktok-arrow.next { right: 6px; }
+
 /* Точки: сколько кадров и какой сейчас. Без них непонятно, что пост вообще
    листается вбок — в ленте это единственная подсказка. */
 .tiktok-dots {
@@ -902,6 +943,7 @@ h2.playtime .num { color: var(--text); }
     justify-content: center;
     gap: 4px;
     pointer-events: none;
+    z-index: 2;
 }
 .tiktok-dots i {
     width: 4px;
@@ -912,13 +954,33 @@ h2.playtime .num { color: var(--text); }
 }
 .tiktok-dots i.on { background: #fff; }
 
+/* Подпись поверх нижнего края: автор и ссылка на оригинал. */
+.tiktok-meta {
+    position: absolute;
+    inset: auto 0 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 10px 8px;
+    background: linear-gradient(to top, rgba(0,0,0,.8), transparent);
+    font-size: 11.5px;
+    z-index: 2;
+}
+.tiktok-meta a { color: var(--text); }
+.tiktok-meta a:hover { color: var(--accent); }
+.tiktok-count {
+    margin-left: auto;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+}
+
 /* Звук выключен по умолчанию — иначе страница заговорит сама. Кнопка
    в углу, чтобы включить осознанно. */
 .tiktok-sound {
     position: absolute;
     top: 8px;
     right: 8px;
-    z-index: 1;
+    z-index: 2;
     border: 0;
     border-radius: var(--radius);
     background: rgba(0,0,0,.55);

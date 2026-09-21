@@ -664,14 +664,16 @@ function initGuestbook() {
 initGuestbook();
 
 /* --------------------------------------------------------------- tiktok --
-   Лента репостов: один пост на экран, следующий — прокруткой вниз.
-   Постов два вида, и ведут они себя по-разному: обычное видео и фото-пост,
-   где кадры листаются вбок под свою звуковую дорожку.
+   Лента репостов: один пост на кадр, следующий — прокруткой вниз.
+   Постов два вида: обычное видео и фото-пост, где кадры листают вбок
+   под свою звуковую дорожку.
 
-   Перелистывание по обеим осям делает нативный scroll-snap в CSS, здесь
-   только воспроизведение: играет то, что видно, остальное на паузе. */
+   Свёрнута по умолчанию, наружу торчит верхушка первого поста. Пока
+   свёрнута — ничего не играет и не качается: иначе три десятка роликов
+   полезли бы через наш сервер к тому, кто их даже не открывал. */
 
 let tiktokMuted = true;
+let tiktokOpen = false;
 
 function tiktokMedia(item) {
     return item.querySelector('video') || item.querySelector('audio');
@@ -692,17 +694,73 @@ function buildPhotoPost(video) {
        этого пост показывался немой картинкой. */
     const audio = video.audioUrl
         ? `<audio preload="none" loop src="${esc(video.audioUrl)}"></audio>` : '';
+    const arrows = video.images.length > 1
+        ? `<button class="tiktok-arrow prev" type="button" aria-label="previous frame">&lsaquo;</button>` +
+          `<button class="tiktok-arrow next" type="button" aria-label="next frame">&rsaquo;</button>`
+        : '';
     return `<div class="tiktok-photos">${frames}</div>` +
-        `<div class="tiktok-dots">${dots}</div>` + audio;
+        `<div class="tiktok-dots">${dots}</div>` + arrows + audio;
+}
+
+/* Листание кадров делаем сами, а не полагаемся на прокрутку: вложенный
+   горизонтальный скролл внутри вертикального scroll-snap перехватывается
+   родителем, а мышью вбок вообще не покрутить. */
+function setupPhotoNav(item, count) {
+    const rail = item.querySelector('.tiktok-photos');
+    const dots = item.querySelectorAll('.tiktok-dots i');
+    const prev = item.querySelector('.tiktok-arrow.prev');
+    const next = item.querySelector('.tiktok-arrow.next');
+    let at = 0;
+
+    const show = index => {
+        at = Math.max(0, Math.min(count - 1, index));
+        rail.scrollTo({ left: at * rail.clientWidth, behavior: 'smooth' });
+        dots.forEach((dot, i) => dot.classList.toggle('on', i === at));
+        if (prev) prev.disabled = at === 0;
+        if (next) next.disabled = at === count - 1;
+    };
+
+    if (prev) {
+        prev.addEventListener('click', event => {
+            event.stopPropagation();
+            show(at - 1);
+        });
+    }
+    if (next) {
+        next.addEventListener('click', event => {
+            event.stopPropagation();
+            show(at + 1);
+        });
+    }
+
+    // тап по краю кадра, как в оригинале
+    rail.addEventListener('click', event => {
+        if (event.target.closest('a, button')) return;
+        const box = rail.getBoundingClientRect();
+        show(event.clientX - box.left > box.width / 2 ? at + 1 : at - 1);
+    });
+
+    // если прокрутить всё-таки удалось — точки не должны врать
+    rail.addEventListener('scroll', () => {
+        const now = Math.round(rail.scrollLeft / rail.clientWidth);
+        if (now !== at) {
+            at = now;
+            dots.forEach((dot, i) => dot.classList.toggle('on', i === at));
+            if (prev) prev.disabled = at === 0;
+            if (next) next.disabled = at === count - 1;
+        }
+    }, { passive: true });
+
+    show(0);
 }
 
 function buildTikTokItem(video, index, total) {
     const item = document.createElement('div');
     item.className = 'tiktok-item';
-    const photos = video.images && video.images.length > 1;
+    const frames = (video.images || []).length;
 
     item.innerHTML =
-        (video.images && video.images.length ? buildPhotoPost(video) : buildVideoPost(video)) +
+        (frames ? buildPhotoPost(video) : buildVideoPost(video)) +
         `<button class="tiktok-sound" type="button">sound on</button>` +
         `<div class="tiktok-meta">` +
         `<a href="${esc(video.url)}" target="_blank" rel="noopener">@${esc(video.author)}</a>` +
@@ -711,21 +769,23 @@ function buildTikTokItem(video, index, total) {
 
     const media = tiktokMedia(item);
 
-    const poster = item.querySelector('.poster');
-    if (poster && media) {
+    if (!frames && media) {
         /* Обложку убираем только когда картинка реально пошла: до этого
            у video пустой чёрный кадр, и перелистывание выглядит как провал. */
         media.addEventListener('loadeddata', () => item.classList.add('ready'));
+        // тап по кадру — пауза, как везде
+        item.addEventListener('click', event => {
+            if (event.target.closest('a, button')) return;
+            if (media.paused) {
+                media.play().catch(() => {});
+            } else {
+                media.pause();
+            }
+        });
     }
 
-    if (photos) {
-        // точки должны показывать, на каком кадре стоишь
-        const rail = item.querySelector('.tiktok-photos');
-        const dots = item.querySelectorAll('.tiktok-dots i');
-        rail.addEventListener('scroll', () => {
-            const at = Math.round(rail.scrollLeft / rail.clientWidth);
-            dots.forEach((dot, i) => dot.classList.toggle('on', i === at));
-        }, { passive: true });
+    if (frames > 1) {
+        setupPhotoNav(item, frames);
     }
 
     item.querySelector('.tiktok-sound').addEventListener('click', event => {
@@ -739,21 +799,15 @@ function buildTikTokItem(video, index, total) {
         });
     });
 
-    if (media) {
-        // тап по кадру — пауза, как везде
-        item.addEventListener('click', event => {
-            if (event.target.closest('a, button')) return;
-            if (media.paused) media.play().catch(() => {}); else media.pause();
-        });
-    }
-
     return item;
 }
 
 function displayTikTok(videos) {
     const section = document.getElementById('tiktok-section');
     const feed = document.getElementById('tiktok-feed');
-    if (!section || !feed) return;
+    const wrap = document.getElementById('tiktok-wrap');
+    const toggle = document.getElementById('tiktok-toggle');
+    if (!section || !feed || !wrap || !toggle) return;
 
     if (!videos.length) {
         // не настроено или TikTok не ответил — секции быть не должно вовсе
@@ -765,13 +819,12 @@ function displayTikTok(videos) {
     videos.forEach((video, index) => feed.appendChild(buildTikTokItem(video, index, videos.length)));
     section.hidden = false;
 
-    /* Грузим и играем только то, что на экране: иначе три десятка роликов
-       полезли бы качаться разом, все через наш сервер. */
+    /* Играет только то, что видно, и только пока блок развёрнут. */
     const watcher = new IntersectionObserver(entries => {
         entries.forEach(entry => {
             const media = tiktokMedia(entry.target);
             if (!media) return;
-            if (entry.isIntersecting) {
+            if (entry.isIntersecting && tiktokOpen) {
                 media.muted = tiktokMuted;
                 media.play().catch(() => {
                     /* автовоспроизведение могут запретить — тогда останется
@@ -784,6 +837,25 @@ function displayTikTok(videos) {
     }, { root: feed, threshold: 0.6 });
 
     feed.querySelectorAll('.tiktok-item').forEach(item => watcher.observe(item));
+
+    toggle.addEventListener('click', () => {
+        tiktokOpen = !tiktokOpen;
+        wrap.classList.toggle('expanded', tiktokOpen);
+        toggle.textContent = tiktokOpen ? 'collapse' : 'expand';
+        toggle.setAttribute('aria-expanded', String(tiktokOpen));
+
+        if (tiktokOpen) {
+            // первый пост уже на экране — наблюдатель сам его не дёрнет
+            const first = tiktokMedia(feed.querySelector('.tiktok-item'));
+            if (first) {
+                first.muted = tiktokMuted;
+                first.play().catch(() => {});
+            }
+        } else {
+            feed.querySelectorAll('video, audio').forEach(media => media.pause());
+            feed.scrollTop = 0;
+        }
+    });
 }
 
 fetch('/tiktok')
