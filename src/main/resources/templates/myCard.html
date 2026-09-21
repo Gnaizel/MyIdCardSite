@@ -82,7 +82,19 @@
              выглядела бы поломкой. -->
         <section class="panel" id="tiktok-section" hidden>
             <h2 class="panel-title">tiktok</h2>
-            <p class="panel-sub">reposts</p>
+            <!-- Значок репоста — тот же, что рисует сам TikTok на вкладке
+                 репостов: две стрелки по кругу. Декоративный, подпись рядом
+                 говорит то же самое словами, поэтому скрыт от чтения вслух. -->
+            <p class="panel-sub repost-sub">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M17 1l4 4-4 4"></path>
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                    <path d="M7 23l-4-4 4-4"></path>
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                </svg>reposts
+            </p>
             <div class="panel-body">
                 <!-- Свёрнут по умолчанию: наружу торчит верх первого поста,
                      чтобы было видно, что там что-то есть и это разворачивается. -->

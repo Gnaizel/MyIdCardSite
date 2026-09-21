@@ -229,6 +229,22 @@ a:hover { color: var(--accent); }
     color: var(--dim);
 }
 
+/* Подпись со значком репоста. flex с gap, а не отступ у svg: так значок
+   встаёт ровно по центру строки при любом размере шрифта, без подгонки
+   vertical-align. Размер — в em, чтобы он тянулся за текстом, а не
+   расходился с ним, если шрифт подписи когда-нибудь поменяется. */
+.repost-sub {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.repost-sub svg {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+    color: var(--accent-mark);
+}
+
 .panel-body { margin-top: 12px; }
 
 /* ------------------------------------------------------------ metadata -- */
