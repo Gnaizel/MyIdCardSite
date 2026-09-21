@@ -675,6 +675,16 @@ initGuestbook();
 let tiktokMuted = true;
 let tiktokOpen = false;
 
+/* TikTok не отдаёт, когда пост был репостнут, поэтому для новых мы засекаем
+   время сами, а для тех, что лежали до начала наблюдения, показываем возраст
+   самого видео. Подписи разные — выдавать одно за другое нельзя. */
+function tiktokAge(video) {
+    if (!video.age) return '';
+    const label = video.ageKind === 'reposted' ? 'reposted' : 'posted';
+    return `<span class="tiktok-age" title="${label} ${esc(video.age)} ago">` +
+        `${label} ${esc(video.age)}</span>`;
+}
+
 function tiktokMedia(item) {
     return item.querySelector('video') || item.querySelector('audio');
 }
@@ -769,6 +779,7 @@ function buildTikTokItem(video, index, total) {
         `<button class="tiktok-sound" type="button">sound on</button>` +
         `<div class="tiktok-meta">` +
         `<a href="${esc(video.url)}" target="_blank" rel="noopener">@${esc(video.author)}</a>` +
+        tiktokAge(video) +
         `<span class="tiktok-count">${index + 1}/${total}</span>` +
         `</div>`;
 

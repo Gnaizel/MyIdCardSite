@@ -1,6 +1,9 @@
 package ru.gnaizel.service.tiktok;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -13,11 +16,18 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import ru.gnaizel.dto.tiktok.TikTokVideoDto;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Репосты с профиля TikTok.
@@ -54,6 +64,14 @@ public class TikTokServiceImpl implements TikTokService {
 
     private final RestTemplate template = timeoutedTemplate();
 
+    private final ObjectMapper json = new ObjectMapper();
+
+    /* Когда каждый пост впервые попался нам на глаза. TikTok не отдаёт время
+       репоста вовсе — ни поля, ни намёка, — поэтому засекаем сами. Для всего,
+       что появится дальше, это и есть время репоста с точностью до часа.
+       Ноль означает «лежало ещё до того, как мы начали смотреть». */
+    private final Map<String, Long> firstSeen = new ConcurrentHashMap<>();
+
     private volatile List<TikTokVideoDto> cached = List.of();
     private volatile Instant cachedAt;
 
@@ -65,6 +83,9 @@ public class TikTokServiceImpl implements TikTokService {
 
     @Value("${tiktok.limit:30}")
     private int limit;
+
+    @Value("${tiktok.cache-dir:${avatar.dir:./data}}")
+    private String cacheDir;
 
     @Override
     public List<TikTokVideoDto> getReposts() {
@@ -106,6 +127,74 @@ public class TikTokServiceImpl implements TikTokService {
         return value != null && !value.isBlank();
     }
 
+    /* Отметки переживают перезапуск: без этого каждая пересборка контейнера
+       начинала бы отсчёт заново, и все посты снова выглядели бы «только что
+       увиденными». */
+    @PostConstruct
+    void loadSeen() {
+        Path file = seenFile();
+        if (!Files.isReadable(file)) {
+            return;
+        }
+        try {
+            firstSeen.putAll(json.readValue(Files.readAllBytes(file),
+                    new TypeReference<Map<String, Long>>() {
+                    }));
+            log.info("TIKTOK: подняты отметки времени по {} постам", firstSeen.size());
+        } catch (IOException | RuntimeException e) {
+            log.error("TIKTOK: не прочитал отметки времени: {}", e.getMessage());
+        }
+    }
+
+    private void saveSeen() {
+        Path file = seenFile();
+        try {
+            Files.createDirectories(file.getParent());
+            Path temp = Files.createTempFile(file.getParent(), "tiktok", ".tmp");
+            Files.write(temp, json.writeValueAsBytes(new HashMap<>(firstSeen)));
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            log.error("TIKTOK: не сохранил отметки времени: {}", e.getMessage());
+        }
+    }
+
+    private Path seenFile() {
+        return Path.of(cacheDir, "tiktok-seen.json");
+    }
+
+    /* Первый запуск особенный: эти посты лежали и до нас, и выдавать их
+       за «только что репостнутые» было бы враньём. Помечаем нулём — значит
+       времени репоста мы не знаем и покажем возраст самого видео. */
+    private void mark(List<String> ids) {
+        boolean seeding = firstSeen.isEmpty();
+        long now = Instant.now().getEpochSecond();
+        boolean added = false;
+        for (String id : ids) {
+            if (!firstSeen.containsKey(id)) {
+                firstSeen.put(id, seeding ? 0L : now);
+                added = true;
+            }
+        }
+        if (added) {
+            saveSeen();
+        }
+    }
+
+    /* Тот же формат, что у треков: 5m, 2h, 3d. */
+    private static String ago(Instant moment) {
+        long minutes = Duration.between(moment, Instant.now()).toMinutes();
+        if (minutes < 1) {
+            return "now";
+        }
+        if (minutes > 1440) {
+            return (minutes / 1440) + "d";
+        }
+        if (minutes > 60) {
+            return (minutes / 60) + "h";
+        }
+        return minutes + "m";
+    }
+
     private List<TikTokVideoDto> fetchAll() {
         List<TikTokVideoDto> all = new ArrayList<>();
         String cursor = "0";
@@ -125,6 +214,20 @@ public class TikTokServiceImpl implements TikTokService {
                 break;
             }
             cursor = body.path("cursor").asText("0");
+        }
+
+        mark(all.stream().map(TikTokVideoDto::getId).toList());
+        for (TikTokVideoDto video : all) {
+            Long seen = firstSeen.get(video.getId());
+            if (seen != null && seen > 0) {
+                video.setAge(ago(Instant.ofEpochSecond(seen)));
+                video.setAgeKind("reposted");
+            } else if (video.getCreatedAt() > 0) {
+                /* Времени репоста не знаем — показываем возраст самого видео
+                   и подписываем иначе, чтобы не выдавать одно за другое. */
+                video.setAge(ago(Instant.ofEpochSecond(video.getCreatedAt())));
+                video.setAgeKind("posted");
+            }
         }
 
         log.info("TIKTOK: получено репостов: {}", all.size());
@@ -176,6 +279,7 @@ public class TikTokServiceImpl implements TikTokService {
                 .cover(cover)
                 .description(item.path("desc").asText(""))
                 .author(author)
+                .createdAt(item.path("createTime").asLong())
                 .images(images);
 
         if (images.isEmpty()) {
