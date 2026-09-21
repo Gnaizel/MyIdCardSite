@@ -643,7 +643,19 @@ a:hover { color: var(--accent); }
 }
 
 .game-head,
+.game-join,
 .game-information { position: relative; z-index: 1; }
+
+/* Отдельная строка со ссылкой на лобби: прижата к правому краю и опущена
+   к часам, в пустую полосу под баннером. Свободное место забирает она,
+   поэтому у часов собственный отступ снимается — иначе пустота делилась бы
+   на двоих и ссылка зависала бы посреди карточки. */
+.game-join {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+}
+.game-join + .game-information { margin-top: 0; }
 
 .game-head {
     display: flex;

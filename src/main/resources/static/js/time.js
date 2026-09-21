@@ -427,7 +427,7 @@ function showGame(game) {
     gameHead.innerHTML = `
         <img src="${esc(game.img_icon_url)}" alt="" loading="lazy">
         <h2 class="last-game-title" title="${esc(game.name)}">${esc(game.name)}</h2>
-        <span class="live">in game</span>${joinLink(game)}`;
+        <span class="live">in game</span>`;
 
     const gameInformation = document.createElement('div');
     gameInformation.classList.add('game-information');
@@ -440,6 +440,19 @@ function showGame(game) {
     setBannerImage(`${game.banner_url}`);
 
     lastGameDiv.appendChild(gameHead);
+
+    /* Ссылка на лобби — своей строкой под шапкой, а не рядом с названием:
+       в шапке она отъедала ширину, и длинные названия из-за неё переносились
+       на вторую строку. Строки нет вовсе, когда ссылки нет, иначе она
+       добавляла бы лишний зазор в карточку одиночной игры. */
+    const join = joinLink(game);
+    if (join) {
+        const joinRow = document.createElement('div');
+        joinRow.className = 'game-join';
+        joinRow.innerHTML = join;
+        lastGameDiv.appendChild(joinRow);
+    }
+
     lastGameDiv.appendChild(gameInformation);
 
     markSelected(game.appid);
