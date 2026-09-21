@@ -1010,6 +1010,16 @@ h2.playtime .num { color: var(--text); }
 }
 .tiktok-meta a { color: var(--text); }
 .tiktok-meta a:hover { color: var(--accent); }
+
+/* Возраст поста рядом с автором. Отдельным приглушённым цветом: это
+   пояснение, а не ссылка, и на него не должно тянуть нажать. */
+.tiktok-age {
+    color: var(--dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
 .tiktok-count {
     margin-left: auto;
     color: var(--dim);
@@ -1425,6 +1435,34 @@ footer .quote {
        на узком экране порядок задаётся явно — и tiktok уходит под игры. */
     .col-side,
     .col-main { display: contents; }
+
+    /* Лента — единственное место на странице с прилипанием. Остальные секции
+       ничем не помечены, поэтому обычная прокрутка везде сохраняется.
+       proximity, а не mandatory: mandatory тянул бы страницу к ленте даже
+       когда просто проходишь мимо. */
+    /* Притяжение появляется только вместе с развёрнутой лентой — и на самой
+       странице тоже. Постоянный scroll-snap-type на html притягивал её к
+       ленте уже при открытии, хотя открывать никто ничего не просил.
+       Пока свёрнута, наружу торчит полоска в 96px: листать там нечего,
+       и прилипание к ней только мешало бы уйти. */
+    html:has(.tiktok-wrap.expanded) { scroll-snap-type: y proximity; }
+    #tiktok-section:has(.tiktok-wrap.expanded) { scroll-snap-align: center; }
+
+    /* Пост по высоте экрана, а не по ширине колонки. На телефоне колонка
+       во всю ширину, и кадр 9:16 оказывался выше экрана — приходилось
+       прокручивать страницу внутри поста, то есть ровно та беда, от которой
+       уходим: тянешься листать пост и уезжаешь страницей.
+       Оставшейся трети экрана хватает, чтобы взяться за страницу и прокрутить
+       её мимо ленты, не задев видео. */
+    .tiktok-feed {
+        aspect-ratio: auto;
+        height: 68vh;
+        height: 68svh;
+    }
+    .tiktok-wrap.expanded {
+        max-height: 68vh;
+        max-height: 68svh;
+    }
 
     .card-id        { order: 1; }
     .about          { order: 2; }

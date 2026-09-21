@@ -43,9 +43,12 @@ public class TikTokServiceImpl implements TikTokService {
     private static final int PAGE = 30;
     private static final int MAX_PAGES = 5;
 
-    /* Обложки подписаны и живут около двух суток. Час — с большим запасом:
-       к моменту, когда ссылка протухнет, мы сходим за списком десятки раз. */
-    private static final Duration TTL = Duration.ofHours(1);
+    /* Верхнюю границу задают обложки: они подписаны и живут около двух суток,
+       так что кэш обязан быть заметно короче. Нижнюю — удаления: пока список
+       лежит у нас, снятый в TikTok репост продолжает висеть на странице.
+       Час под второе оказался велик, четверть часа — разумный предел
+       расхождения с профилем ценой четырёх заходов в час вместо одного. */
+    private static final Duration TTL = Duration.ofMinutes(15);
 
     /* TikTok отдаёт браузерный ответ и на простой запрос, но без узнаваемого
        User-Agent начинает подсовывать проверку. */
@@ -176,6 +179,7 @@ public class TikTokServiceImpl implements TikTokService {
                 .cover(cover)
                 .description(item.path("desc").asText(""))
                 .author(author)
+                .createdAt(item.path("createTime").asLong())
                 .images(images);
 
         if (images.isEmpty()) {

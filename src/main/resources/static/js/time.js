@@ -1,3 +1,10 @@
+/* Страница открывается сверху, а не там, где её закрыли в прошлый раз.
+   Это одна длинная визитка: восстановленная прокрутка высаживает посреди
+   чужого блока, и выглядит это как сбой, а не как забота. */
+if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+}
+
 /* Названия треков и игр приходят извне и попадают в innerHTML — экранируем. */
 function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -675,6 +682,20 @@ initGuestbook();
 let tiktokMuted = true;
 let tiktokOpen = false;
 
+/* Когда автор выложил видео — в формате треков: 5m, 2h, 3d.
+   Именно posted, а не reposted: времени репоста TikTok не отдаёт, и подпись
+   не должна обещать больше, чем мы знаем. Считаем здесь, а не на сервере:
+   список лежит в кэше час, и готовая строка старела бы прямо на экране. */
+function tiktokAge(video) {
+    if (!video.createdAt) return '';
+    const minutes = Math.floor((Date.now() / 1000 - video.createdAt) / 60);
+    if (minutes < 1) return '';
+    const age = minutes > 1440 ? Math.floor(minutes / 1440) + 'd'
+        : minutes > 60 ? Math.floor(minutes / 60) + 'h'
+        : minutes + 'm';
+    return `<span class="tiktok-age" title="posted ${age} ago">posted ${age}</span>`;
+}
+
 function tiktokMedia(item) {
     return item.querySelector('video') || item.querySelector('audio');
 }
@@ -769,6 +790,7 @@ function buildTikTokItem(video, index, total) {
         `<button class="tiktok-sound" type="button">sound on</button>` +
         `<div class="tiktok-meta">` +
         `<a href="${esc(video.url)}" target="_blank" rel="noopener">@${esc(video.author)}</a>` +
+        tiktokAge(video) +
         `<span class="tiktok-count">${index + 1}/${total}</span>` +
         `</div>`;
 
