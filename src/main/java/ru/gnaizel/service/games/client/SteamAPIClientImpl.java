@@ -2,6 +2,7 @@ package ru.gnaizel.service.games.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -15,6 +16,7 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import ru.gnaizel.dto.games.GOGSteamResponseDto;
+import ru.gnaizel.dto.games.NowPlayingDto;
 import ru.gnaizel.dto.games.SteamOwnedGamesResponse;
 import ru.gnaizel.exception.SteamApiResponseException;
 
@@ -29,6 +31,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -66,6 +69,16 @@ public class SteamAPIClientImpl implements SteamAPIClient {
     /* Пауза между живыми запросами: пять подряд Steam считает частотой. */
     private static final long PAUSE_MS = 500;
 
+    /* Профили всех аккаунтов умещаются в один запрос, поэтому «во что играет
+       прямо сейчас» стоит ровно одно обращение в минуту, независимо от того,
+       сколько человек смотрит страницу. */
+    private static final String SUMMARIES_URL =
+            "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=%s&steamids=%s";
+
+    /* Минута: индикатор живой, но чаще спрашивать незачем — партия столько
+       не длится, а запросы копятся. */
+    private static final Duration NOW_TTL = Duration.ofMinutes(1);
+
     private final RestTemplate template = new RestTemplate();
     private final ObjectMapper json = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -76,6 +89,9 @@ public class SteamAPIClientImpl implements SteamAPIClient {
        не стоит беспокоить. */
     private final Map<String, Snapshot> store = new ConcurrentHashMap<>();
     private final Map<String, Instant> banned = new ConcurrentHashMap<>();
+
+    private volatile Optional<NowPlayingDto> nowPlaying = Optional.empty();
+    private volatile Instant nowPlayingAt;
 
     @Value("${steam.api-token}")
     private String token;
@@ -129,6 +145,47 @@ public class SteamAPIClientImpl implements SteamAPIClient {
         return new Library(List.copyOf(merged.values()), complete);
     }
 
+    @Override
+    public Optional<NowPlayingDto> getNowPlaying() {
+        if (nowPlayingAt != null
+                && Duration.between(nowPlayingAt, Instant.now()).compareTo(NOW_TTL) < 0) {
+            return nowPlaying;
+        }
+
+        List<String> accounts = steamIds();
+        if (accounts.isEmpty()) {
+            return Optional.empty();
+        }
+
+        try {
+            JsonNode response = template.getForObject(
+                    SUMMARIES_URL.formatted(token, String.join(",", accounts)), JsonNode.class);
+            nowPlaying = firstInGame(response);
+        } catch (RestClientException e) {
+            /* Индикатор живой: лучше на минуту показать «не играет», чем
+               оставить гореть то, чего уже нет. */
+            log.warn("STEAM: не узнал текущую игру: {}", e.getMessage());
+            nowPlaying = Optional.empty();
+        }
+        nowPlayingAt = Instant.now();
+        return nowPlaying;
+    }
+
+    /* gameextrainfo есть в профиле, только пока игра запущена. Аккаунтов
+       несколько, но играют на одном — берём первый найденный. */
+    private Optional<NowPlayingDto> firstInGame(JsonNode response) {
+        if (response == null) {
+            return Optional.empty();
+        }
+        for (JsonNode player : response.path("response").path("players")) {
+            String name = player.path("gameextrainfo").asText(null);
+            if (name != null && !name.isBlank()) {
+                return Optional.of(new NowPlayingDto(player.path("gameid").asInt(), name));
+            }
+        }
+        return Optional.empty();
+    }
+
     private boolean needsRefresh(String id) {
         Instant until = banned.get(id);
         if (until != null && until.isAfter(Instant.now())) {
@@ -160,16 +217,16 @@ public class SteamAPIClientImpl implements SteamAPIClient {
     }
 
     /* Steam иногда сам говорит, сколько ждать — тогда слушаем его, а не себя. */
-    private java.util.Optional<Duration> retryAfter(HttpStatusCodeException e) {
+    private Optional<Duration> retryAfter(HttpStatusCodeException e) {
         String header = e.getResponseHeaders() == null
                 ? null : e.getResponseHeaders().getFirst(HttpHeaders.RETRY_AFTER);
         if (header == null || header.isBlank()) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
         try {
-            return java.util.Optional.of(Duration.ofSeconds(Long.parseLong(header.trim())));
+            return Optional.of(Duration.ofSeconds(Long.parseLong(header.trim())));
         } catch (NumberFormatException ignored) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
     }
 

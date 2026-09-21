@@ -27,4 +27,8 @@ public class GameDto {
     String rtime_last_played;
 
     int playtime_disconnected;
+
+    /* Запущена прямо сейчас. Приходит не из библиотеки, а из профиля Steam,
+       и живёт ровно пока игра открыта. */
+    boolean playingNow;
 }

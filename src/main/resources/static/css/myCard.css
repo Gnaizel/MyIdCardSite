@@ -539,6 +539,21 @@ a:hover { color: var(--accent); }
 /* у активного трека место занято эквалайзером, а не «5 минут назад» */
 .track.playing .track-time-later { display: none; }
 
+/* Тот же эквалайзер в блоке игр: и в списке, и в крупной карточке. Правило
+   одно на оба, потому что разметка эквалайзера одинаковая. */
+.game.playing .eq,
+.last-game.playing .eq {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-end;
+    gap: 2px;
+    height: 11px;
+}
+/* В списке часы уступают место индикатору — как «5 минут назад» у трека. */
+.game.playing .game-info .playtime-forever { display: none; }
+.game.playing .game-title { color: var(--strong); }
+.last-game.playing .last-game-title { color: var(--accent); }
+
 /* трек сменился — карточка мигает появлением, чтобы это было заметно
    боковым зрением, но не дёргало страницу */
 .track.is-new { animation: track-in .28s ease-out; }

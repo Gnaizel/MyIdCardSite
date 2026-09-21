@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.gnaizel.dto.games.FortniteStatsDto;
 import ru.gnaizel.dto.games.GOGSteamResponseDto;
 import ru.gnaizel.dto.games.GameDto;
+import ru.gnaizel.dto.games.NowPlayingDto;
 import ru.gnaizel.exception.GameFiltrationError;
 import ru.gnaizel.mapper.game.GameMapper;
 import ru.gnaizel.model.games.Game;
@@ -76,10 +77,29 @@ public class GameServiceImpl implements GameService {
         library.fortnite().ifPresent(stats -> games.add(
                 GameMapper.fortniteToGame(stats, fortniteTitle, fortniteIcon, fortniteBanner)));
 
+        games.sort(Comparator.comparing(Game::getRtime_last_played).reversed());
+
+        /* Запущенную игру поднимаем наверх независимо от того, что записано
+           в библиотеке: Steam обновляет время последнего запуска не сразу,
+           и пока он думает, игра стояла бы в списке на вчерашнем месте.
+           А «играю прямо сейчас» — это и есть самое свежее, что может быть. */
+        Optional<NowPlayingDto> now = steamAPIClient.getNowPlaying();
+        now.ifPresent(playing -> {
+            int at = indexOf(games, playing.getAppid());
+            if (at >= 0) {
+                games.add(0, games.remove(at));
+            } else {
+                /* Игры нет в библиотеке — значит запустили впервые, и до
+                   следующего обновления библиотеки её неоткуда взять.
+                   Показываем то, что знаем из профиля: название и appid. */
+                games.add(0, GameMapper.nowPlayingToGame(playing));
+            }
+        });
+
+        int playingAppid = now.map(NowPlayingDto::getAppid).orElse(-1);
         List<GameDto> recent = games.stream()
-                .sorted(Comparator.comparing(Game::getRtime_last_played).reversed())
                 .limit(limit)
-                .map(GameMapper::gameToGameDto)
+                .map(game -> GameMapper.gameToGameDto(game, game.getAppid() == playingAppid))
                 .toList();
 
         if (recent.isEmpty()) {
@@ -87,6 +107,15 @@ public class GameServiceImpl implements GameService {
         }
 
         return recent;
+    }
+
+    private static int indexOf(List<Game> games, int appid) {
+        for (int i = 0; i < games.size(); i++) {
+            if (games.get(i).getAppid() == appid) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /** Часы считаются по всей библиотеке, а не по показанной её верхушке. */

@@ -371,6 +371,7 @@ function displayMyGameLib() {
             /* Самую свежую игру больше не выбрасываем из списка: без неё
                нумерация начиналась со второй, и «01» стояло не у той игры,
                что показана крупно слева. */
+            gamePlaying = data.some(game => game.playingNow);
             displayGameLib(data);
             showGame(data[0]);
             /* Общие часы одни на весь блок и от выбранной игры не зависят,
@@ -400,13 +401,17 @@ function showGame(game) {
     }
 
     lastGameDiv.innerHTML = '';
+    /* Классом на блоке, а не на самом эквалайзере: так же, как у трека,
+       и CSS остаётся одним правилом на оба списка. */
+    lastGameDiv.classList.toggle('playing', Boolean(game.playingNow));
 
     const gameHead = document.createElement('div');
     gameHead.classList.add('game-head');
 
     gameHead.innerHTML = `
         <img src="${esc(game.img_icon_url)}" alt="" loading="lazy">
-        <h2 class="last-game-title" title="${esc(game.name)}">${esc(game.name)}</h2>`;
+        <h2 class="last-game-title" title="${esc(game.name)}">${esc(game.name)}</h2>
+        <span class="eq" role="img" aria-label="playing now"><i></i><i></i><i></i></span>`;
 
     const gameInformation = document.createElement('div');
     gameInformation.classList.add('game-information');
@@ -451,7 +456,9 @@ function displayGameLib(data) {
                     <div class="game-info">
                         <div class="game-title" title="${esc(game.name)}">${esc(game.name)}</div>
                         <div class="playtime-forever">${esc(game.playtime_forever)}</div>
-                    </div>`;
+                    </div>
+                    <span class="eq" role="img" aria-label="playing now"><i></i><i></i><i></i></span>`;
+        gameElement.classList.toggle('playing', Boolean(game.playingNow));
         gameElement.addEventListener('click', () => showGame(game));
         gameLib.appendChild(gameElement);
     })
@@ -501,7 +508,33 @@ function setBannerImage(imageUrl) {
 }
 
 displayMyGameLib();
-setInterval(displayMyGameLib, 60000)
+/* Пока играет — опрашиваем чаще, в остальное время реже: список игр
+   меняется редко, а индикатор должен гаснуть без большой задержки.
+   Скрытая вкладка не опрашивает вовсе. */
+const GAME_POLL_PLAYING = 30000;
+const GAME_POLL_IDLE = 120000;
+let gameTimer = null;
+let gamePlaying = false;
+
+function scheduleGames() {
+    clearTimeout(gameTimer);
+    if (document.hidden) return;
+    gameTimer = setTimeout(() => {
+        displayMyGameLib();
+        scheduleGames();
+    }, gamePlaying ? GAME_POLL_PLAYING : GAME_POLL_IDLE);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        clearTimeout(gameTimer);
+    } else {
+        displayMyGameLib();
+        scheduleGames();
+    }
+});
+
+scheduleGames();
 
 /* Гостевая книга. Постмодерация: сообщение видно сразу, спрятать его может
    только владелец ключом. Всё, что пришло с сервера, уходит в DOM через esc(). */
