@@ -730,8 +730,18 @@ function applyTikTokSound() {
    режим и пробуем снова: тишина лучше замершего видео, а кнопка при этом
    честно показывает, что звука нет. */
 function playTikTok(media) {
-    media.play().catch(() => {
-        if (media.muted) return;
+    media.play().catch(error => {
+        /* Отказать play() может по разным причинам, а немым режимом лечится
+           ровно одна: NotAllowedError — браузер не пустил со звуком.
+
+           Всё остальное к звуку отношения не имеет. Чаще всего это
+           AbortError: наблюдатель зовёт pause() на уходящем кадре, пока его
+           же play() ещё не завершился, и при быстром листании это штатная
+           гонка, а не сбой. Раньше она тоже считалась отказом со звуком —
+           и звук глох сам посреди листания, на случайном ролике. */
+        if (media.muted || !error || error.name !== 'NotAllowedError') {
+            return;
+        }
         tiktokMuted = true;
         applyTikTokSound();
         media.play().catch(() => {});
