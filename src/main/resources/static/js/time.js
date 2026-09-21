@@ -850,6 +850,38 @@ function setupPhotoNav(item, count) {
     show(0);
 }
 
+/* Описание поста. Свёрнуто до двух строк: развёрнутое целиком у длинных
+   подписей закрывало бы полкадра — ровно то, ради чего в TikTok его и
+   прячут. Пустого блока нет вовсе: у части репостов подписи нет, и он
+   съедал бы место молча. */
+function tiktokDesc(video) {
+    const text = (video.description || '').trim();
+    if (!text) return '';
+    return `<p class="tiktok-desc">${esc(text)}</p>`;
+}
+
+/* Кнопка появляется, только если текст правда не поместился. Узнать это
+   можно исключительно после вёрстки — отсюда замер, а не длина строки:
+   сколько строк займёт подпись, зависит от ширины колонки и от того,
+   какие в ней слова. */
+function setupCaptions(feed) {
+    feed.querySelectorAll('.tiktok-desc').forEach(desc => {
+        if (desc.scrollHeight <= desc.clientHeight + 1) return;
+
+        const more = document.createElement('button');
+        more.className = 'tiktok-more';
+        more.type = 'button';
+        more.textContent = 'more';
+        /* Нажатие не должно доходить до кадра: там оно ставит видео
+           на паузу, а разворачивали подпись. */
+        more.addEventListener('click', event => {
+            event.stopPropagation();
+            more.textContent = desc.classList.toggle('open') ? 'less' : 'more';
+        });
+        desc.after(more);
+    });
+}
+
 function buildTikTokItem(video, index, total) {
     const item = document.createElement('div');
     item.className = 'tiktok-item';
@@ -859,10 +891,12 @@ function buildTikTokItem(video, index, total) {
         (frames ? buildPhotoPost(video) : buildVideoPost(video)) +
         soundButton() +
         `<div class="tiktok-meta">` +
+        tiktokDesc(video) +
+        `<div class="tiktok-meta-row">` +
         `<a href="${esc(video.url)}" target="_blank" rel="noopener">@${esc(video.author)}</a>` +
         tiktokAge(video) +
         `<span class="tiktok-count">${index + 1}/${total}</span>` +
-        `</div>`;
+        `</div></div>`;
 
     const media = tiktokMedia(item);
 
@@ -934,6 +968,10 @@ function displayTikTok(videos) {
     }, { root: feed, threshold: 0.6 });
 
     feed.querySelectorAll('.tiktok-item').forEach(item => watcher.observe(item));
+
+    /* Через кадр: до вёрстки высоты нулевые, и «не поместилось» не отличить
+       от «ещё не измерено». */
+    requestAnimationFrame(() => setupCaptions(feed));
 
     const setOpen = open => {
         tiktokOpen = open;
