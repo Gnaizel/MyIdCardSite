@@ -718,7 +718,9 @@ function applyTikTokSound() {
         media.muted = tiktokMuted;
     });
     document.querySelectorAll('.tiktok-sound').forEach(button => {
-        button.textContent = tiktokMuted ? 'sound on' : 'sound off';
+        button.classList.toggle('muted', tiktokMuted);
+        button.querySelector('.tiktok-sound-label').textContent =
+            tiktokMuted ? 'sound on' : 'sound off';
     });
 }
 
@@ -736,6 +738,26 @@ function playTikTok(media) {
     });
 }
 
+/* Значок на кнопке звука. Один динамик на оба состояния: волны и перечёркивание
+   переключает CSS по классу, поэтому разметка не пересобирается при каждом
+   нажатии и кнопка не моргает. */
+const SOUND_ICON =
+    `<svg class="tiktok-sound-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"` +
+    ` stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
+    `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>` +
+    `<g class="waves">` +
+    `<path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>` +
+    `<path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>` +
+    `</g>` +
+    `<g class="slash">` +
+    `<path d="M22.5 9.5l-5 5"></path><path d="M17.5 9.5l5 5"></path>` +
+    `</g></svg>`;
+
+function soundButton() {
+    return `<button class="tiktok-sound muted" type="button">` +
+        SOUND_ICON + `<span class="tiktok-sound-label">sound on</span></button>`;
+}
+
 function tiktokMedia(item) {
     return item.querySelector('video') || item.querySelector('audio');
 }
@@ -747,7 +769,15 @@ function buildVideoPost(video) {
     return `<img class="backdrop" src="${esc(video.cover)}" alt="" aria-hidden="true">` +
         `<video preload="none" loop playsinline muted poster="${esc(video.cover)}"` +
         ` src="${esc(video.videoUrl)}"></video>` +
-        `<img class="poster" src="${esc(video.cover)}" alt="" loading="lazy">`;
+        `<img class="poster" src="${esc(video.cover)}" alt="" loading="lazy">` +
+        /* Значок паузы поверх кадра. Нажимают не по нему, а по самому кадру,
+           поэтому он ничего не ловит и нужен только как подтверждение,
+           что видео стоит, а не зависло. */
+        `<div class="tiktok-pause" aria-hidden="true">` +
+        `<svg viewBox="0 0 24 24" fill="currentColor">` +
+        `<rect x="7" y="5" width="3.4" height="14" rx="1.2"></rect>` +
+        `<rect x="13.6" y="5" width="3.4" height="14" rx="1.2"></rect>` +
+        `</svg></div>`;
 }
 
 function buildPhotoPost(video) {
@@ -827,7 +857,7 @@ function buildTikTokItem(video, index, total) {
 
     item.innerHTML =
         (frames ? buildPhotoPost(video) : buildVideoPost(video)) +
-        `<button class="tiktok-sound" type="button">sound on</button>` +
+        soundButton() +
         `<div class="tiktok-meta">` +
         `<a href="${esc(video.url)}" target="_blank" rel="noopener">@${esc(video.author)}</a>` +
         tiktokAge(video) +
@@ -840,6 +870,14 @@ function buildTikTokItem(video, index, total) {
         /* Обложку убираем только когда картинка реально пошла: до этого
            у video пустой чёрный кадр, и перелистывание выглядит как провал. */
         media.addEventListener('loadeddata', () => item.classList.add('ready'));
+
+        /* Состояние снимаем с самого видео, а не выставляем в обработчике
+           нажатия: на паузу его ставит ещё и наблюдатель, когда кадр уходит
+           с экрана, и значок иначе расходился бы с тем, что происходит.
+           До первого запуска видео тоже стоит — класс поставлен сразу. */
+        item.classList.add('paused');
+        media.addEventListener('play', () => item.classList.remove('paused'));
+        media.addEventListener('pause', () => item.classList.add('paused'));
         // тап по кадру — пауза, как везде
         item.addEventListener('click', event => {
             if (event.target.closest('a, button')) return;

@@ -1082,8 +1082,52 @@ h2.playtime .num { color: var(--text); }
     font-size: 11px;
     padding: 3px 7px;
     cursor: pointer;
+    /* flex с gap, а не отступ у svg: значок встаёт по центру строки сам,
+       без подгонки vertical-align под размер шрифта. */
+    display: flex;
+    align-items: center;
+    gap: 5px;
 }
 .tiktok-sound:hover { color: var(--accent); }
+
+.tiktok-sound-ico {
+    width: 1.15em;
+    height: 1.15em;
+    flex: 0 0 auto;
+}
+
+/* Динамик один на оба состояния: меняются только волны и перечёркивание.
+   Класс muted означает «звука нет» — то есть кнопка предлагает включить. */
+.tiktok-sound .slash { display: none; }
+.tiktok-sound.muted .waves { display: none; }
+.tiktok-sound.muted .slash { display: block; }
+
+/* Значок паузы поверх кадра. Полупрозрачный и мелкий: он подтверждает, что
+   видео остановлено, а не зовёт нажать — нажимают по самому кадру, поэтому
+   значок событий не ловит вовсе. */
+.tiktok-pause {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+.tiktok-pause svg {
+    width: 34px;
+    height: 34px;
+    color: rgba(255, 255, 255, .5);
+    /* Тень, а не сплошная подложка: кадр под значком бывает и белым,
+       и чёрным, и без неё значок пропадал бы на светлом. */
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, .55));
+}
+
+/* Только в развёрнутой ленте: в свёрнутой всё стоит на паузе по определению,
+   и значок висел бы на превью не переставая. */
+.tiktok-wrap.expanded .tiktok-item.paused .tiktok-pause { opacity: 1; }
 
 /* -------------------------------------------------------------- github --
    Наружу приходят одни числа: ни имён репозиториев, ни сообщений коммитов.
