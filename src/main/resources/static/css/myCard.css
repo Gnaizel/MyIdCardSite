@@ -541,19 +541,37 @@ a:hover { color: var(--accent); }
 
 /* «В игре прямо сейчас». Намеренно НЕ эквалайзер: он остаётся языком музыки,
    и если тем же знаком отмечать игры, два раздела перестают различаться
-   боковым зрением. Здесь слово в скобках — так же оформлены заголовки
-   секций, то есть знак говорит на языке сайта и не требует догадки. */
+   боковым зрением. Здесь точка и слово — знак прямого эфира, понятный без
+   пояснений. */
 .live { display: none; }
 .game.playing .live,
 .last-game.playing .live {
-    display: inline;
+    /* inline-flex с gap, а не отступ у точки: так точка встаёт по центру
+       строки при любом размере шрифта, без подгонки vertical-align. */
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     flex: 0 0 auto;
     font-size: 11.5px;
     letter-spacing: .04em;
     color: var(--accent);
 }
-.live::before { content: "[ "; }
-.live::after  { content: " ]"; }
+.live::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: live-pulse 2.4s ease-in-out infinite;
+}
+
+/* Пульсация нарочно неглубокая и медленная: точка должна ловиться боковым
+   зрением, а не тянуть внимание на себя с середины страницы. */
+@keyframes live-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: .4; }
+}
 
 /* Ссылка на лобби. Её рисует скрипт и только когда Steam её дал, поэтому
    прятать нечего — но подчёркивание нужно: это единственное место в блоке,
