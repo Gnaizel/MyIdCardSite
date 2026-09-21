@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Репосты с профиля TikTok.
@@ -43,7 +44,7 @@ public class TikTokServiceImpl implements TikTokService {
 
     /* TikTok отдаёт браузерный ответ и на простой запрос, но без узнаваемого
        User-Agent начинает подсовывать проверку. */
-    private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    public static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36";
 
     private final RestTemplate template = timeoutedTemplate();
@@ -77,6 +78,18 @@ public class TikTokServiceImpl implements TikTokService {
         }
         cachedAt = Instant.now();
         return cached;
+    }
+
+    @Override
+    public Optional<String> playAddr(String id) {
+        /* Ищем по уже полученному списку, а не принимаем адрес снаружи:
+           иначе ручка превратилась бы в открытый прокси, которым можно
+           ходить куда угодно от имени сервера. */
+        return getReposts().stream()
+                .filter(video -> video.getId().equals(id))
+                .map(TikTokVideoDto::getPlayAddr)
+                .filter(addr -> addr != null && !addr.isBlank())
+                .findFirst();
     }
 
     private List<TikTokVideoDto> fetch() {
@@ -113,7 +126,9 @@ public class TikTokServiceImpl implements TikTokService {
                     "https://www.tiktok.com/@%s/video/%s".formatted(author, id),
                     cover,
                     item.path("desc").asText(""),
-                    author));
+                    author,
+                    "/tiktok/video/" + id,
+                    item.path("video").path("playAddr").asText(null)));
             if (videos.size() >= limit) {
                 break;
             }

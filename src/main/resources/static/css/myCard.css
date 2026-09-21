@@ -804,57 +804,86 @@ h2.playtime .num { color: var(--text); }
 .game:hover .game-info .playtime-forever { color: var(--dim); }
 
 /* -------------------------------------------------------------- tiktok --
-   Видео вертикальные, 9:16 — сетка под них, а не под квадраты, иначе
-   обложки резались бы по краям. Три в ряд: при колонке в 290px это ~88px
-   на плитку, меньше уже не разглядеть, больше — не влезает. */
+   Лента как в самом TikTok: одно видео на всю ширину колонки, следующее —
+   прокруткой вниз. Прилипание делает нативный scroll-snap, поэтому здесь
+   нет ни одного обработчика жестов: колесо, палец и клавиатура работают
+   сами и одинаково. */
 
-.tiktok-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+.tiktok-feed {
+    /* Высота ровно под один кадр 9:16 — именно она превращает прокрутку
+       в перелистывание: следующее видео начинается за краем окна. */
+    aspect-ratio: 9 / 16;
+    max-height: 60vh;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    border-radius: var(--radius-tile);
+    background: var(--panel-soft);
+    /* полоса прокрутки тут только мешает: перелистывание и так очевидно */
+    scrollbar-width: none;
 }
+.tiktok-feed::-webkit-scrollbar { display: none; }
 
 .tiktok-item {
     position: relative;
-    display: block;
-    aspect-ratio: 9 / 16;
-    border-radius: var(--radius-tile);
+    height: 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
     overflow: hidden;
-    background: var(--panel-soft);
 }
 
-.tiktok-item img {
+.tiktok-item video,
+.tiktok-item .poster {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    /* Та же логика, что у аватарки: страница монохромная, а обложки приходят
-       какие угодно. Приглушение держит их в палитре, на наведении — полный
-       цвет, чтобы разглядеть. */
-    filter: saturate(.55) brightness(.78);
-    transition: filter .2s ease, transform .2s ease;
-}
-.tiktok-item:hover img,
-.tiktok-item:focus-visible img {
-    filter: none;
-    transform: scale(1.04);
-}
-.tiktok-item:focus-visible {
-    outline: 1px solid var(--accent-line);
-    outline-offset: 1px;
+    display: block;
 }
 
-/* Автор поверх нижнего края: без подписи сетка обложек ни о чём не говорит. */
-.tiktok-author {
+/* Пока видео не загрузилось, на его месте обложка — иначе при перелистывании
+   зияет пустой тёмный прямоугольник. */
+.tiktok-item .poster {
+    position: absolute;
+    inset: 0;
+    transition: opacity .25s ease;
+}
+.tiktok-item.ready .poster { opacity: 0; }
+
+/* Подпись поверх нижнего края: автор и ссылка на оригинал. */
+.tiktok-meta {
     position: absolute;
     inset: auto 0 0 0;
-    padding: 12px 6px 4px;
-    font-size: 10.5px;
-    color: var(--text);
-    background: linear-gradient(to top, rgba(0,0,0,.75), transparent);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 24px 10px 8px;
+    background: linear-gradient(to top, rgba(0,0,0,.8), transparent);
+    font-size: 11.5px;
 }
+.tiktok-meta a { color: var(--text); }
+.tiktok-meta a:hover { color: var(--accent); }
+.tiktok-count {
+    margin-left: auto;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Звук выключен по умолчанию — иначе страница заговорит сама. Кнопка
+   в углу, чтобы включить осознанно. */
+.tiktok-sound {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    border: 0;
+    border-radius: var(--radius);
+    background: rgba(0,0,0,.55);
+    color: var(--text);
+    font: inherit;
+    font-size: 11px;
+    padding: 3px 7px;
+    cursor: pointer;
+}
+.tiktok-sound:hover { color: var(--accent); }
 
 /* -------------------------------------------------------------- github --
    Наружу приходят одни числа: ни имён репозиториев, ни сообщений коммитов.

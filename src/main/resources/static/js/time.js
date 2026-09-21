@@ -664,14 +664,53 @@ function initGuestbook() {
 initGuestbook();
 
 /* --------------------------------------------------------------- tiktok --
-   Репосты тянутся с профиля. Обложки подписаны и живут около двух суток,
-   поэтому бэк обновляет список раз в час — здесь достаточно спросить один
-   раз при загрузке. */
+   Лента репостов: одно видео на экран, следующее — прокруткой вниз.
+   Перелистывание делает нативный scroll-snap в CSS, здесь только
+   воспроизведение: играет то, что видно, остальные стоят на паузе. */
+
+let tiktokMuted = true;
+
+function buildTikTokItem(video, index, total) {
+    const item = document.createElement('div');
+    item.className = 'tiktok-item';
+    item.innerHTML =
+        `<video preload="none" loop playsinline muted poster="${esc(video.cover)}"` +
+        ` src="${esc(video.videoUrl)}"></video>` +
+        `<img class="poster" src="${esc(video.cover)}" alt="" loading="lazy">` +
+        `<button class="tiktok-sound" type="button">sound on</button>` +
+        `<div class="tiktok-meta">` +
+        `<a href="${esc(video.url)}" target="_blank" rel="noopener">@${esc(video.author)}</a>` +
+        `<span class="tiktok-count">${index + 1}/${total}</span>` +
+        `</div>`;
+
+    const media = item.querySelector('video');
+    /* Обложку убираем только когда картинка реально пошла: до этого
+       у video пустой чёрный кадр, и перелистывание выглядит как провал. */
+    media.addEventListener('loadeddata', () => item.classList.add('ready'));
+
+    item.querySelector('.tiktok-sound').addEventListener('click', event => {
+        event.stopPropagation();
+        tiktokMuted = !tiktokMuted;
+        document.querySelectorAll('.tiktok-item video').forEach(other => {
+            other.muted = tiktokMuted;
+        });
+        document.querySelectorAll('.tiktok-sound').forEach(button => {
+            button.textContent = tiktokMuted ? 'sound on' : 'sound off';
+        });
+    });
+
+    // тап по кадру — пауза, как везде
+    media.addEventListener('click', () => {
+        if (media.paused) media.play().catch(() => {}); else media.pause();
+    });
+
+    return item;
+}
 
 function displayTikTok(videos) {
     const section = document.getElementById('tiktok-section');
-    const grid = document.getElementById('tiktok-grid');
-    if (!section || !grid) return;
+    const feed = document.getElementById('tiktok-feed');
+    if (!section || !feed) return;
 
     if (!videos.length) {
         // не настроено или TikTok не ответил — секции быть не должно вовсе
@@ -679,20 +718,29 @@ function displayTikTok(videos) {
         return;
     }
 
-    grid.innerHTML = '';
-    videos.forEach(video => {
-        const item = document.createElement('a');
-        item.className = 'tiktok-item';
-        item.href = video.url;
-        item.target = '_blank';
-        item.rel = 'noopener';
-        item.title = video.description || ('@' + video.author);
-        item.innerHTML =
-            `<img src="${esc(video.cover)}" alt="" loading="lazy">` +
-            `<span class="tiktok-author">@${esc(video.author)}</span>`;
-        grid.appendChild(item);
-    });
+    feed.innerHTML = '';
+    videos.forEach((video, index) => feed.appendChild(buildTikTokItem(video, index, videos.length)));
     section.hidden = false;
+
+    /* Грузим и играем только то, что на экране: иначе девять роликов
+       полезли бы качаться разом, все через наш сервер. */
+    const watcher = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            const media = entry.target.querySelector('video');
+            if (!media) return;
+            if (entry.isIntersecting) {
+                media.muted = tiktokMuted;
+                media.play().catch(() => {
+                    /* автовоспроизведение могут запретить — тогда останется
+                       обложка и тап по кадру, это рабочее состояние */
+                });
+            } else {
+                media.pause();
+            }
+        });
+    }, { root: feed, threshold: 0.6 });
+
+    feed.querySelectorAll('.tiktok-item').forEach(item => watcher.observe(item));
 }
 
 fetch('/tiktok')
