@@ -16,10 +16,10 @@ import java.time.format.DateTimeFormatter;
 public class GameMapper {
 
     public static GameDto gameToGameDto(Game game) {
-        return gameToGameDto(game, false);
+        return gameToGameDto(game, false, null);
     }
 
-    public static GameDto gameToGameDto(Game game, boolean playingNow) {
+    public static GameDto gameToGameDto(Game game, boolean playingNow, String joinUrl) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
         Integer playtime2weeks = game.getPlaytime_2weeks();
         Integer playtimeForever = game.getPlaytime_forever();
@@ -41,6 +41,7 @@ public class GameMapper {
                 .rtime_last_played(lastPlayed)
                 .playtime_disconnected(game.getPlaytime_disconnected())
                 .playingNow(playingNow)
+                .joinUrl(joinUrl)
                 .build();
     }
 

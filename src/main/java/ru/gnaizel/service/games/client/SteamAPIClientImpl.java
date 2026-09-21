@@ -179,11 +179,25 @@ public class SteamAPIClientImpl implements SteamAPIClient {
         }
         for (JsonNode player : response.path("response").path("players")) {
             String name = player.path("gameextrainfo").asText(null);
-            if (name != null && !name.isBlank()) {
-                return Optional.of(new NowPlayingDto(player.path("gameid").asInt(), name));
+            if (name == null || name.isBlank()) {
+                continue;
             }
+            int appid = player.path("gameid").asInt();
+            return Optional.of(new NowPlayingDto(appid, name, joinUrl(player, appid)));
         }
         return Optional.empty();
+    }
+
+    /* lobbysteamid Steam присылает, только когда игрок сидит в лобби, куда
+       пускают со стороны: у одиночных игр и вне лобби поля просто нет.
+       Ссылка того же вида, по которой заходят из списка друзей, поэтому
+       откроется она лишь у того, у кого установлен Steam. */
+    private static String joinUrl(JsonNode player, int appid) {
+        String lobby = player.path("lobbysteamid").asText(null);
+        if (lobby == null || lobby.isBlank()) {
+            return null;
+        }
+        return "steam://joinlobby/%d/%s/%s".formatted(appid, lobby, player.path("steamid").asText());
     }
 
     private boolean needsRefresh(String id) {

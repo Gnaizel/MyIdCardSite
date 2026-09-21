@@ -386,6 +386,15 @@ function displayMyGameLib() {
         })
 }
 
+/* Ссылку рисуем, только когда Steam её дал: она появляется лишь у игр
+   со своим лобби и лишь пока в него пускают. У одиночных игр её не будет
+   никогда, и это нормально, а не поломка.
+   rel и target не нужны: steam:// открывает не вкладку, а сам клиент. */
+function joinLink(game) {
+    if (!game.joinUrl) return '';
+    return `<a class="join" href="${esc(game.joinUrl)}">join</a>`;
+}
+
 /* Крупный блок показывает выбранную игру, а не только самую свежую:
    по клику в списке сюда приезжает статистика любой из них. */
 function showGame(game) {
@@ -411,7 +420,7 @@ function showGame(game) {
     gameHead.innerHTML = `
         <img src="${esc(game.img_icon_url)}" alt="" loading="lazy">
         <h2 class="last-game-title" title="${esc(game.name)}">${esc(game.name)}</h2>
-        <span class="eq" role="img" aria-label="playing now"><i></i><i></i><i></i></span>`;
+        <span class="live">in game</span>${joinLink(game)}`;
 
     const gameInformation = document.createElement('div');
     gameInformation.classList.add('game-information');
@@ -457,7 +466,7 @@ function displayGameLib(data) {
                         <div class="game-title" title="${esc(game.name)}">${esc(game.name)}</div>
                         <div class="playtime-forever">${esc(game.playtime_forever)}</div>
                     </div>
-                    <span class="eq" role="img" aria-label="playing now"><i></i><i></i><i></i></span>`;
+                    <span class="live">in game</span>`;
         gameElement.classList.toggle('playing', Boolean(game.playingNow));
         gameElement.addEventListener('click', () => showGame(game));
         gameLib.appendChild(gameElement);

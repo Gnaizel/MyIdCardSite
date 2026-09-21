@@ -539,20 +539,39 @@ a:hover { color: var(--accent); }
 /* у активного трека место занято эквалайзером, а не «5 минут назад» */
 .track.playing .track-time-later { display: none; }
 
-/* Тот же эквалайзер в блоке игр: и в списке, и в крупной карточке. Правило
-   одно на оба, потому что разметка эквалайзера одинаковая. */
-.game.playing .eq,
-.last-game.playing .eq {
-    display: flex;
+/* «В игре прямо сейчас». Намеренно НЕ эквалайзер: он остаётся языком музыки,
+   и если тем же знаком отмечать игры, два раздела перестают различаться
+   боковым зрением. Здесь слово в скобках — так же оформлены заголовки
+   секций, то есть знак говорит на языке сайта и не требует догадки. */
+.live { display: none; }
+.game.playing .live,
+.last-game.playing .live {
+    display: inline;
     flex: 0 0 auto;
-    align-items: flex-end;
-    gap: 2px;
-    height: 11px;
+    font-size: 11.5px;
+    letter-spacing: .04em;
+    color: var(--accent);
 }
-/* В списке часы уступают место индикатору — как «5 минут назад» у трека. */
+.live::before { content: "[ "; }
+.live::after  { content: " ]"; }
+
+/* Ссылка на лобби. Её рисует скрипт и только когда Steam её дал, поэтому
+   прятать нечего — но подчёркивание нужно: это единственное место в блоке,
+   по которому уходят со страницы. */
+.join {
+    flex: 0 0 auto;
+    font-size: 11.5px;
+    letter-spacing: .04em;
+    color: var(--accent);
+    border-bottom: 1px solid var(--accent-line);
+}
+.join:hover { color: var(--strong); border-bottom-color: var(--strong); }
+.join::before { content: "[ "; border: 0; }
+.join::after  { content: " ]"; border: 0; }
+
+/* В списке часы уступают место надписи — как «5 минут назад» у трека. */
 .game.playing .game-info .playtime-forever { display: none; }
 .game.playing .game-title { color: var(--strong); }
-.last-game.playing .last-game-title { color: var(--accent); }
 
 /* трек сменился — карточка мигает появлением, чтобы это было заметно
    боковым зрением, но не дёргало страницу */

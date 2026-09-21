@@ -15,4 +15,9 @@ import lombok.NoArgsConstructor;
 public class NowPlayingDto {
     private int appid;
     private String name;
+
+    /* Ссылка «зайти в игру», если Steam её вообще даёт. Появляется, только
+       когда игрок в лобби, куда можно присоединиться: у одиночных игр
+       и вне лобби её нет, и это нормальное состояние, а не сбой. */
+    private String joinUrl;
 }

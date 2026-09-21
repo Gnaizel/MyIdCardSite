@@ -97,9 +97,13 @@ public class GameServiceImpl implements GameService {
         });
 
         int playingAppid = now.map(NowPlayingDto::getAppid).orElse(-1);
+        String joinUrl = now.map(NowPlayingDto::getJoinUrl).orElse(null);
         List<GameDto> recent = games.stream()
                 .limit(limit)
-                .map(game -> GameMapper.gameToGameDto(game, game.getAppid() == playingAppid))
+                .map(game -> {
+                    boolean playing = game.getAppid() == playingAppid;
+                    return GameMapper.gameToGameDto(game, playing, playing ? joinUrl : null);
+                })
                 .toList();
 
         if (recent.isEmpty()) {
