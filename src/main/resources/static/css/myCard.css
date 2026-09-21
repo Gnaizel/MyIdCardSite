@@ -803,6 +803,59 @@ h2.playtime .num { color: var(--text); }
 }
 .game:hover .game-info .playtime-forever { color: var(--dim); }
 
+/* -------------------------------------------------------------- tiktok --
+   Видео вертикальные, 9:16 — сетка под них, а не под квадраты, иначе
+   обложки резались бы по краям. Три в ряд: при колонке в 290px это ~88px
+   на плитку, меньше уже не разглядеть, больше — не влезает. */
+
+.tiktok-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.tiktok-item {
+    position: relative;
+    display: block;
+    aspect-ratio: 9 / 16;
+    border-radius: var(--radius-tile);
+    overflow: hidden;
+    background: var(--panel-soft);
+}
+
+.tiktok-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Та же логика, что у аватарки: страница монохромная, а обложки приходят
+       какие угодно. Приглушение держит их в палитре, на наведении — полный
+       цвет, чтобы разглядеть. */
+    filter: saturate(.55) brightness(.78);
+    transition: filter .2s ease, transform .2s ease;
+}
+.tiktok-item:hover img,
+.tiktok-item:focus-visible img {
+    filter: none;
+    transform: scale(1.04);
+}
+.tiktok-item:focus-visible {
+    outline: 1px solid var(--accent-line);
+    outline-offset: 1px;
+}
+
+/* Автор поверх нижнего края: без подписи сетка обложек ни о чём не говорит. */
+.tiktok-author {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 12px 6px 4px;
+    font-size: 10.5px;
+    color: var(--text);
+    background: linear-gradient(to top, rgba(0,0,0,.75), transparent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* -------------------------------------------------------------- github --
    Наружу приходят одни числа: ни имён репозиториев, ни сообщений коммитов.
    Поэтому вся секция — это счётчики и календарь, а не лента изменений. */

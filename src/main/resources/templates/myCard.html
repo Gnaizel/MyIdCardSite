@@ -77,6 +77,17 @@
             </div>
         </section>
 
+        <!-- Блок появляется, только если репосты реально пришли: скрипт
+             убирает его целиком, когда список пуст. Пустая секция с заголовком
+             выглядела бы поломкой. -->
+        <section class="panel" id="tiktok-section" hidden>
+            <h2 class="panel-title">tiktok</h2>
+            <p class="panel-sub">reposts</p>
+            <div class="panel-body">
+                <div id="tiktok-grid" class="tiktok-grid"></div>
+            </div>
+        </section>
+
         </aside>
         <div class="col-main">
 

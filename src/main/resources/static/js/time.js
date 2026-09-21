@@ -662,3 +662,40 @@ function initGuestbook() {
 }
 
 initGuestbook();
+
+/* --------------------------------------------------------------- tiktok --
+   Репосты тянутся с профиля. Обложки подписаны и живут около двух суток,
+   поэтому бэк обновляет список раз в час — здесь достаточно спросить один
+   раз при загрузке. */
+
+function displayTikTok(videos) {
+    const section = document.getElementById('tiktok-section');
+    const grid = document.getElementById('tiktok-grid');
+    if (!section || !grid) return;
+
+    if (!videos.length) {
+        // не настроено или TikTok не ответил — секции быть не должно вовсе
+        section.hidden = true;
+        return;
+    }
+
+    grid.innerHTML = '';
+    videos.forEach(video => {
+        const item = document.createElement('a');
+        item.className = 'tiktok-item';
+        item.href = video.url;
+        item.target = '_blank';
+        item.rel = 'noopener';
+        item.title = video.description || ('@' + video.author);
+        item.innerHTML =
+            `<img src="${esc(video.cover)}" alt="" loading="lazy">` +
+            `<span class="tiktok-author">@${esc(video.author)}</span>`;
+        grid.appendChild(item);
+    });
+    section.hidden = false;
+}
+
+fetch('/tiktok')
+    .then(response => response.json())
+    .then(displayTikTok)
+    .catch(err => console.error('Ошибка при получении репостов TikTok:', err));
