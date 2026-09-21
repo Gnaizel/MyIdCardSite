@@ -709,6 +709,33 @@ function tiktokAge(video) {
     return `<span class="tiktok-age" title="posted ${age} ago">posted ${age}</span>`;
 }
 
+/* Звук общий на всю ленту: кнопка на кадре переключает её целиком, иначе
+   после каждого пролистывания его пришлось бы включать заново. Надпись на
+   кнопке называет действие, а не состояние: «sound on» — значит нажми,
+   чтобы включить. */
+function applyTikTokSound() {
+    document.querySelectorAll('.tiktok-item video, .tiktok-item audio').forEach(media => {
+        media.muted = tiktokMuted;
+    });
+    document.querySelectorAll('.tiktok-sound').forEach(button => {
+        button.textContent = tiktokMuted ? 'sound on' : 'sound off';
+    });
+}
+
+/* Со звуком браузер пускает не всегда: правило про автовоспроизведение
+   у каждого своё, и отказ приходит уже после запроса. Молча проглотить его
+   нельзя — кадр останется стоять картинкой. Поэтому на отказе включаем немой
+   режим и пробуем снова: тишина лучше замершего видео, а кнопка при этом
+   честно показывает, что звука нет. */
+function playTikTok(media) {
+    media.play().catch(() => {
+        if (media.muted) return;
+        tiktokMuted = true;
+        applyTikTokSound();
+        media.play().catch(() => {});
+    });
+}
+
 function tiktokMedia(item) {
     return item.querySelector('video') || item.querySelector('audio');
 }
@@ -817,7 +844,7 @@ function buildTikTokItem(video, index, total) {
         item.addEventListener('click', event => {
             if (event.target.closest('a, button')) return;
             if (media.paused) {
-                media.play().catch(() => {});
+                playTikTok(media);
             } else {
                 media.pause();
             }
@@ -831,12 +858,7 @@ function buildTikTokItem(video, index, total) {
     item.querySelector('.tiktok-sound').addEventListener('click', event => {
         event.stopPropagation();
         tiktokMuted = !tiktokMuted;
-        document.querySelectorAll('.tiktok-item video, .tiktok-item audio').forEach(other => {
-            other.muted = tiktokMuted;
-        });
-        document.querySelectorAll('.tiktok-sound').forEach(button => {
-            button.textContent = tiktokMuted ? 'sound on' : 'sound off';
-        });
+        applyTikTokSound();
     });
 
     return item;
@@ -866,10 +888,7 @@ function displayTikTok(videos) {
             if (!media) return;
             if (entry.isIntersecting && tiktokOpen) {
                 media.muted = tiktokMuted;
-                media.play().catch(() => {
-                    /* автовоспроизведение могут запретить — тогда останется
-                       картинка и тап по кадру, это рабочее состояние */
-                });
+                playTikTok(media);
             } else {
                 media.pause();
             }
@@ -888,11 +907,19 @@ function displayTikTok(videos) {
         toggle.setAttribute('aria-label', tiktokOpen ? 'hide reposts' : 'show reposts');
 
         if (tiktokOpen) {
+            /* Разворот и есть «включить»: ленту открыли намеренно, смотреть
+               её немой незачем. Звук включается именно здесь, потому что
+               разворот — это клик: без жеста браузер бы не пустил.
+               Кнопка на кадре никуда не делась, звук после этого выключается
+               обратно и включается снова сколько угодно. */
+            tiktokMuted = false;
+            applyTikTokSound();
+
             // первый пост уже на экране — наблюдатель сам его не дёрнет
             const first = tiktokMedia(feed.querySelector('.tiktok-item'));
             if (first) {
                 first.muted = tiktokMuted;
-                first.play().catch(() => {});
+                playTikTok(first);
             }
         } else {
             feed.querySelectorAll('video, audio').forEach(media => media.pause());
