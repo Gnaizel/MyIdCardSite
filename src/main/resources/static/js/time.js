@@ -675,14 +675,14 @@ initGuestbook();
 let tiktokMuted = true;
 let tiktokOpen = false;
 
-/* TikTok не отдаёт, когда пост был репостнут, поэтому для новых мы засекаем
-   время сами, а для тех, что лежали до начала наблюдения, показываем возраст
-   самого видео. Подписи разные — выдавать одно за другое нельзя. */
+/* Времени репоста TikTok не отдаёт, поэтому мы засекаем его сами — с той
+   минуты, как пост впервые попался нам на глаза. У репостнутых раньше его
+   взять неоткуда, и тогда подписи просто нет: дата, когда автор выложил
+   видео, тут стояла раньше и только путала — это чужое действие. */
 function tiktokAge(video) {
     if (!video.age) return '';
-    const label = video.ageKind === 'reposted' ? 'reposted' : 'posted';
-    return `<span class="tiktok-age" title="${label} ${esc(video.age)} ago">` +
-        `${label} ${esc(video.age)}</span>`;
+    return `<span class="tiktok-age" title="reposted ${esc(video.age)} ago">` +
+        `reposted ${esc(video.age)}</span>`;
 }
 
 function tiktokMedia(item) {
@@ -854,8 +854,8 @@ function displayTikTok(videos) {
 
     feed.querySelectorAll('.tiktok-item').forEach(item => watcher.observe(item));
 
-    toggle.addEventListener('click', () => {
-        tiktokOpen = !tiktokOpen;
+    const setOpen = open => {
+        tiktokOpen = open;
         wrap.classList.toggle('expanded', tiktokOpen);
         /* Текста у кнопки нет — шеврон переворачивается через CSS
            по aria-expanded, так что состояние и рисуется, и озвучивается
@@ -873,6 +873,17 @@ function displayTikTok(videos) {
         } else {
             feed.querySelectorAll('video, audio').forEach(media => media.pause());
             feed.scrollTop = 0;
+        }
+    };
+
+    toggle.addEventListener('click', () => setOpen(!tiktokOpen));
+
+    /* Свёрнутая лента разворачивается и по нажатию на сам торчащий кадр:
+       он для того и торчит. Внутри ленты в этот момент pointer-events
+       выключены, так что нажатие достаётся обёртке, а не видео. */
+    wrap.addEventListener('click', () => {
+        if (!tiktokOpen) {
+            setOpen(true);
         }
     });
 }

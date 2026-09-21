@@ -221,13 +221,10 @@ public class TikTokServiceImpl implements TikTokService {
             Long seen = firstSeen.get(video.getId());
             if (seen != null && seen > 0) {
                 video.setAge(ago(Instant.ofEpochSecond(seen)));
-                video.setAgeKind("reposted");
-            } else if (video.getCreatedAt() > 0) {
-                /* Времени репоста не знаем — показываем возраст самого видео
-                   и подписываем иначе, чтобы не выдавать одно за другое. */
-                video.setAge(ago(Instant.ofEpochSecond(video.getCreatedAt())));
-                video.setAgeKind("posted");
             }
+            /* Если времени репоста не знаем — не пишем ничего. Дата, когда
+               автор выложил видео, тут стояла раньше и только путала: это
+               чужое действие и чужое время, а спрашивали про своё. */
         }
 
         log.info("TIKTOK: получено репостов: {}", all.size());
@@ -279,7 +276,6 @@ public class TikTokServiceImpl implements TikTokService {
                 .cover(cover)
                 .description(item.path("desc").asText(""))
                 .author(author)
-                .createdAt(item.path("createTime").asLong())
                 .images(images);
 
         if (images.isEmpty()) {
