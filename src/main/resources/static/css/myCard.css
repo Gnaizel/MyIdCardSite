@@ -1010,16 +1010,6 @@ h2.playtime .num { color: var(--text); }
 }
 .tiktok-meta a { color: var(--text); }
 .tiktok-meta a:hover { color: var(--accent); }
-/* Возраст поста рядом с автором. Отдельным приглушённым цветом: это
-   пояснение, а не ссылка, и на него не должно тянуть нажать. */
-.tiktok-age {
-    color: var(--dim);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-}
-
 .tiktok-count {
     margin-left: auto;
     color: var(--dim);

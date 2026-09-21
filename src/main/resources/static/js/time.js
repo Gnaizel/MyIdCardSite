@@ -675,16 +675,6 @@ initGuestbook();
 let tiktokMuted = true;
 let tiktokOpen = false;
 
-/* Времени репоста TikTok не отдаёт, поэтому мы засекаем его сами — с той
-   минуты, как пост впервые попался нам на глаза. У репостнутых раньше его
-   взять неоткуда, и тогда подписи просто нет: дата, когда автор выложил
-   видео, тут стояла раньше и только путала — это чужое действие. */
-function tiktokAge(video) {
-    if (!video.age) return '';
-    return `<span class="tiktok-age" title="reposted ${esc(video.age)} ago">` +
-        `reposted ${esc(video.age)}</span>`;
-}
-
 function tiktokMedia(item) {
     return item.querySelector('video') || item.querySelector('audio');
 }
@@ -779,7 +769,6 @@ function buildTikTokItem(video, index, total) {
         `<button class="tiktok-sound" type="button">sound on</button>` +
         `<div class="tiktok-meta">` +
         `<a href="${esc(video.url)}" target="_blank" rel="noopener">@${esc(video.author)}</a>` +
-        tiktokAge(video) +
         `<span class="tiktok-count">${index + 1}/${total}</span>` +
         `</div>`;
 
