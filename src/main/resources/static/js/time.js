@@ -565,6 +565,48 @@ document.addEventListener('visibilitychange', () => {
 
 scheduleGames();
 
+/* Во что играю прямо сейчас — по презенсу Discord.
+
+   Нужно для игр, которых нет в Steam. У Riot живого статуса для Valorant
+   не отдаёт ни одна открытая ручка: в официальном API его нет, а внутренняя
+   просит токены, которые добываются только из запущенного клиента. Discord
+   же определяет запущенную игру сам, и его презенс приходит обычным GET.
+
+   Показываем, только когда Steam молчит: если играю в игру из списка,
+   индикатор уже горит на её карточке, и второй такой же рядом — шум. */
+function displayPresence() {
+    const row = document.getElementById('playing-now');
+    const name = document.getElementById('playing-now-game');
+    if (!row || !name) return;
+
+    fetch('/presence')
+        // 204 — «не играю»: тела нет вовсе, разбирать нечего
+        .then(response => (response.status === 204 ? null : response.json()))
+        .then(data => {
+            if (!data || !data.game || gamePlaying) {
+                row.hidden = true;
+                return;
+            }
+            name.textContent = data.game;
+            /* details Discord заполняет не у всех игр — тогда подсказка
+               повторяет название, и это лучше пустого title. */
+            name.title = data.details || data.game;
+            row.hidden = false;
+        })
+        .catch(() => {
+            /* Сервис чужой: замолчал — просто не показываем строку,
+               а не пишем об этом на странице. */
+            row.hidden = true;
+        });
+}
+
+displayPresence();
+/* Тот же темп, что у списка игр в простое: статус должен гаснуть без
+   большой задержки, но чужой сервис дёргать чаще незачем. */
+setInterval(() => {
+    if (!document.hidden) displayPresence();
+}, 45000);
+
 /* Гостевая книга. Постмодерация: сообщение видно сразу, спрятать его может
    только владелец ключом. Всё, что пришло с сервера, уходит в DOM через esc(). */
 const GB_MAX = 280;

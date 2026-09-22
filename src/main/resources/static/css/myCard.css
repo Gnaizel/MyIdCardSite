@@ -559,18 +559,41 @@ a:hover { color: var(--accent); }
    и если тем же знаком отмечать игры, два раздела перестают различаться
    боковым зрением. Здесь точка и слово — знак прямого эфира, понятный без
    пояснений. */
-.live { display: none; }
-.game.playing .live,
-.last-game.playing .live {
+/* Вид у индикатора один на все места, а вот показывается он по-разному:
+   на карточке игры — когда та играет, в строке под подзаголовком — всегда,
+   потому что сама строка появляется только тогда, когда есть что сказать. */
+.live {
+    display: none;
     /* inline-flex с gap, а не отступ у точки: так точка встаёт по центру
        строки при любом размере шрифта, без подгонки vertical-align. */
-    display: inline-flex;
     align-items: center;
     gap: 6px;
     flex: 0 0 auto;
     font-size: 11.5px;
     letter-spacing: .04em;
     color: var(--accent);
+}
+.game.playing .live,
+.last-game.playing .live,
+.playing-now .live { display: inline-flex; }
+
+/* Строка про игру не из Steam. У такой игры нет ни карточки, ни часов —
+   загореться индикатору негде, поэтому он стоит сам по себе под
+   подзаголовком блока. */
+.playing-now {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 12.5px;
+}
+.playing-now[hidden] { display: none; }
+.playing-now-game {
+    color: var(--strong);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .live::before {
     content: "";
