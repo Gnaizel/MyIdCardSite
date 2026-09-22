@@ -575,19 +575,47 @@ a:hover { color: var(--accent); }
 }
 .game.playing .live,
 .last-game.playing .live,
-.playing-now .live { display: inline-flex; }
+.playing-now .live {
+    display: inline-flex;
+    /* появляется из display: none — без проявления он выскакивал рывком */
+    animation: fade-in .35s ease-out;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+}
 
 /* Строка про игру не из Steam. У такой игры нет ни карточки, ни часов —
    загореться индикатору негде, поэтому он стоит сам по себе под
    подзаголовком блока. */
 .playing-now {
+    /* Строка раскрывается по высоте, а не появляется сразу: блок под ней
+       съезжает вниз плавно. 0fr → 1fr — единственный способ анимировать
+       высоту «по содержимому» без замеров в скрипте. */
+    display: grid;
+    grid-template-rows: 0fr;
+    margin-top: 0;
+    opacity: 0;
+    visibility: hidden;
+    font-size: 12.5px;
+    transition: grid-template-rows .4s ease, margin-top .4s ease,
+                opacity .3s ease, visibility 0s linear .4s;
+}
+.playing-now.shown {
+    grid-template-rows: 1fr;
+    margin-top: 6px;
+    opacity: 1;
+    visibility: visible;
+    transition: grid-template-rows .4s ease, margin-top .4s ease,
+                opacity .3s ease .1s, visibility 0s;
+}
+.playing-now-inner {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 6px;
-    font-size: 12.5px;
+    min-height: 0;
+    overflow: hidden;
 }
-.playing-now[hidden] { display: none; }
 .playing-now-game {
     color: var(--strong);
     min-width: 0;
@@ -617,6 +645,9 @@ a:hover { color: var(--accent); }
    по которому уходят со страницы. */
 .join {
     flex: 0 0 auto;
+    /* inline-block: у строчного подчёркивание вылезает за строку, и
+       обёртка с overflow: hidden, которая раскрывает строку, его срезала */
+    display: inline-block;
     font-size: 11.5px;
     letter-spacing: .04em;
     color: var(--accent);
@@ -631,8 +662,17 @@ a:hover { color: var(--accent); }
 .game.playing .game-title { color: var(--strong); }
 
 /* трек сменился — карточка мигает появлением, чтобы это было заметно
-   боковым зрением, но не дёргало страницу */
-.track.is-new { animation: track-in .28s ease-out; }
+   боковым зрением, но не дёргало страницу; так же входит новая игра в список */
+.track.is-new,
+.game.is-new { animation: track-in .28s ease-out; }
+
+/* Обновившееся значение коротко вспыхивает акцентом и гаснет до своего
+   цвета. Анимируется только цвет: цифры не прыгают и соседей не двигают. */
+.bump { animation: value-in .9s ease-out; }
+
+@keyframes value-in {
+    from { color: var(--accent); }
+}
 
 @keyframes track-in {
     from { opacity: 0; transform: translateY(-5px); }
@@ -691,10 +731,42 @@ a:hover { color: var(--accent); }
    на двоих и ссылка зависала бы посреди карточки. */
 .game-join {
     margin-top: auto;
+    /* Строка есть всегда, но свёрнута, пока ссылки нет. Отрицательный
+       нижний отступ съедает gap карточки, иначе пустая строка добавляла бы
+       зазор в карточку одиночной игры. Раскрывается и сворачивается
+       плавно — карточка больше не вздрагивает, когда ссылка приходит. */
+    display: grid;
+    grid-template-rows: 0fr;
+    margin-bottom: -12px;
+    opacity: 0;
+    visibility: hidden;
+    transition: grid-template-rows .4s ease, margin-bottom .4s ease,
+                opacity .3s ease, visibility 0s linear .4s;
+}
+.game-join.shown {
+    grid-template-rows: 1fr;
+    margin-bottom: 0;
+    opacity: 1;
+    visibility: visible;
+    transition: grid-template-rows .4s ease, margin-bottom .4s ease,
+                opacity .3s ease .1s, visibility 0s;
+}
+.game-join-inner {
     display: flex;
     justify-content: flex-end;
+    min-height: 0;
+    overflow: hidden;
 }
 .game-join + .game-information { margin-top: 0; }
+
+/* Выбрали другую игру — её шапка и цифры проявляются, а не подменяются
+   в тот же кадр. */
+.last-game.is-switching > .game-head,
+.last-game.is-switching > .game-information { animation: card-in .35s ease-out; }
+
+@keyframes card-in {
+    from { opacity: 0; transform: translateY(3px); }
+}
 
 .game-head {
     display: flex;
@@ -1375,6 +1447,7 @@ h2.playtime .num { color: var(--text); }
     height: 100%;
     border-radius: 2px;
     background: rgba(var(--accent-rgb), .55);
+    transition: width .7s cubic-bezier(.2, .7, .2, 1);
 }
 .rotation-list li:first-child .rot-bar i { background: rgb(var(--accent-rgb)); }
 

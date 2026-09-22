@@ -12,6 +12,29 @@ function esc(value) {
     })[ch]);
 }
 
+function reducedMotion() {
+    return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/* Перезапуск CSS-анимации: снять класс и вернуть его в том же кадре
+   нельзя — браузер склеит это в «ничего не поменялось». */
+function replay(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+}
+
+/* Меняет текст, только если он правда другой. С animate новое значение
+   коротко вспыхивает акцентом: видно, что обновилось, а вёрстка не
+   сдвигается — анимируется только цвет. */
+function setText(el, text, animate) {
+    if (!el) return;
+    const value = String(text ?? '');
+    if (el.textContent === value) return;
+    el.textContent = value;
+    if (animate) replay(el, 'bump');
+}
+
 function updateTime() {
     fetch('/time')
         .then(response => response.text())
@@ -243,11 +266,10 @@ function ghCompact(value) {
     return String(num);
 }
 
+let ghDaysKey = null;
+
 function displayGithub(data) {
-    const set = (id, text) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = text;
-    };
+    const set = (id, text) => setText(document.getElementById(id), text, true);
 
     set('gh-total', ghCompact(data.totalContributions));
     set('gh-commits', ghCompact(data.commits));
@@ -268,10 +290,14 @@ function displayGithub(data) {
     const months = document.getElementById('gh-months');
     if (!heatmap || !months) return;
 
+    const days = Array.isArray(data.days) ? data.days : [];
+    // календарь не изменился — не пересобираем четыре сотни клеток зря
+    const daysKey = JSON.stringify(days);
+    if (daysKey === ghDaysKey) return;
+    ghDaysKey = daysKey;
+
     heatmap.innerHTML = '';
     months.innerHTML = '';
-
-    const days = Array.isArray(data.days) ? data.days : [];
     if (!days.length) return;
 
     /* Первая неделя календаря почти всегда неполная, поэтому колонку и строку
@@ -341,20 +367,40 @@ function displayRotation(data) {
 
     const max = Math.max(...artists.map(artist => artist.plays || 0), 1);
 
-    list.innerHTML = artists.map(artist => `
-        <li>
-            <span class="rot-name" title="${esc(artist.name)}">${esc(artist.name)}</span>
-            <span class="rot-bar"><i style="width: ${Math.round((artist.plays / max) * 100)}%"></i></span>
-            <span class="rot-plays">${esc(artist.plays)}</span>
-        </li>`).join('');
+    /* Строки переиспользуются: при пересборке полоски каждый раз рисовались
+       заново с нуля. Теперь новые строки вырастают из нуля один раз,
+       а на опросе полоски плавно доезжают до новой длины. */
+    const rows = Array.from(list.children);
+    const firstPaint = rows.length === 0;
+    for (let i = rows.length; i < artists.length; i++) {
+        const li = document.createElement('li');
+        li.innerHTML = '<span class="rot-name"></span>'
+            + '<span class="rot-bar"><i style="width: 0"></i></span>'
+            + '<span class="rot-plays"></span>';
+        list.appendChild(li);
+        rows.push(li);
+    }
+    rows.slice(artists.length).forEach(li => li.remove());
+    // без замера до смены ширины браузер не увидит нуля и не анимирует рост
+    void list.offsetWidth;
+
+    artists.forEach((artist, i) => {
+        const li = rows[i];
+        const name = li.querySelector('.rot-name');
+        setText(name, artist.name, false);
+        name.title = artist.name ?? '';
+        li.querySelector('.rot-bar i').style.width = Math.round((artist.plays / max) * 100) + '%';
+        setText(li.querySelector('.rot-plays'), artist.plays, !firstPaint);
+    });
 
     if (sub) {
-        sub.textContent = data.totalPlays + ' plays across '
-            + data.artistCount + ' artists · last 12 months';
+        setText(sub, data.totalPlays + ' plays across '
+            + data.artistCount + ' artists · last 12 months', false);
     }
     if (note) {
         const top = artists[0];
-        note.innerHTML = `<b>${esc(top.name)}</b> is ${esc(top.share)}% of my year`;
+        const html = `<b>${esc(top.name)}</b> is ${esc(top.share)}% of my year`;
+        if (note.innerHTML !== html) note.innerHTML = html;
     }
 }
 
@@ -371,35 +417,55 @@ function fetchRotation() {
 fetchRotation();
 setInterval(fetchRotation, 300000);
 
+/* Блок игр опрашивается раз в полминуты, и раньше на каждом опросе он
+   собирался заново: баннер удалялся и проявлялся с нуля, список и часы
+   на мгновение пустели. Со стороны это выглядело как мигание без причины.
+   Теперь разметка живёт всё время, а опрос меняет в ней только то, что
+   правда поменялось, — и именно это плавно подсвечивается. */
+let gamesByKey = new Map();
+let selectedGameKey = null;   // выбрана кликом; null — показываем самую свежую
+let shownGameKey = null;
+
+/* У Fortnite appid нет (0), так что ключ по одному appid склеил бы любые
+   две игры без него. */
+function gameKey(game) {
+    return game.appid ? String(game.appid) : 'name:' + (game.name ?? '');
+}
+
 function displayMyGameLib() {
     fetch('/games')
-        .then(rep => rep.json())
+        .then(rep => {
+            if (!rep.ok) throw new Error('HTTP ' + rep.status);
+            return rep.json();
+        })
         .then(data => {
             /* Самую свежую игру больше не выбрасываем из списка: без неё
                нумерация начиналась со второй, и «01» стояло не у той игры,
                что показана крупно слева. */
             gamePlaying = data.some(game => game.playingNow);
+            gamesByKey = new Map(data.map(game => [gameKey(game), game]));
             displayGameLib(data);
-            showGame(data[0]);
+            /* Выбранная кликом игра остаётся выбранной и после опроса:
+               раньше каждые полминуты крупный блок сам перескакивал
+               обратно на первую. */
+            showGame((selectedGameKey && gamesByKey.get(selectedGameKey)) || data[0]);
             /* Общие часы одни на весь блок и от выбранной игры не зависят,
-               поэтому запрашиваются один раз, а не на каждый клик. */
+               поэтому запрашиваются вместе со списком, а не на каждый клик. */
             displayTotalHours();
+            // индикатор Discord зависит от того, играю ли в Steam, — сверяем сразу
+            displayPresence();
         })
         .catch(err => {
             console.error("Ошибка при получении или отображении игр:", err);
+            displayPresence();
 
+            /* Одна неудачная попытка не должна стирать уже нарисованный
+               список: ошибку показываем, только если показывать больше нечего. */
             const gameLib = document.getElementById('game-lib');
-            gameLib.innerHTML = '<p>Ошибка загрузки игр.</p>';
-        })
-}
-
-/* Ссылку рисуем, только когда Steam её дал: она появляется лишь у игр
-   со своим лобби и лишь пока в него пускают. У одиночных игр её не будет
-   никогда, и это нормально, а не поломка.
-   rel и target не нужны: steam:// открывает не вкладку, а сам клиент. */
-function joinLink(game) {
-    if (!game.joinUrl) return '';
-    return `<a class="join" href="${esc(game.joinUrl)}">join</a>`;
+            if (gameLib && !gameLib.querySelector('.game')) {
+                gameLib.innerHTML = '<p>Ошибка загрузки игр.</p>';
+            }
+        });
 }
 
 /* Крупный блок показывает выбранную игру, а не только самую свежую:
@@ -410,94 +476,169 @@ function showGame(game) {
         return;
     }
 
-    const lastGameDiv = document.getElementById('last-game');
-    if (!lastGameDiv) {
+    const card = document.getElementById('last-game');
+    if (!card) {
         console.warn("Элемент с id 'last-game' не найден.");
         return;
     }
 
-    lastGameDiv.innerHTML = '';
-    /* Классом на блоке, а не на самом эквалайзере: так же, как у трека,
-       и CSS остаётся одним правилом на оба списка. */
-    lastGameDiv.classList.toggle('playing', Boolean(game.playingNow));
+    const key = gameKey(game);
+    /* Сменилась сама игра — проявляется карточка целиком. Та же игра
+       с новыми цифрами — подсвечиваются только эти цифры. */
+    const switched = shownGameKey !== key;
+    shownGameKey = key;
 
-    const gameHead = document.createElement('div');
-    gameHead.classList.add('game-head');
-
-    gameHead.innerHTML = `
-        <img src="${esc(game.img_icon_url)}" alt="" loading="lazy">
-        <h2 class="last-game-title" title="${esc(game.name)}">${esc(game.name)}</h2>
-        <span class="live">in game</span>`;
-
-    const gameInformation = document.createElement('div');
-    gameInformation.classList.add('game-information');
-
-    gameInformation.innerHTML = `
-        <h3 class="playtime-forever">playtime forever: ${esc(game.playtime_forever)}</h3>
-        <h3 class="playtime-2weeks">playtime 2 weeks: ${esc(game.playtime_2weeks)}</h3>
-        <h3 class="playtime-sessions">last played: ${esc(game.rtime_last_played)}</h3>
-    `;
-    setBannerImage(`${game.banner_url}`);
-
-    lastGameDiv.appendChild(gameHead);
-
-    /* Ссылка на лобби — своей строкой под шапкой, а не рядом с названием:
-       в шапке она отъедала ширину, и длинные названия из-за неё переносились
-       на вторую строку. Строки нет вовсе, когда ссылки нет, иначе она
-       добавляла бы лишний зазор в карточку одиночной игры. */
-    const join = joinLink(game);
-    if (join) {
-        const joinRow = document.createElement('div');
-        joinRow.className = 'game-join';
-        joinRow.innerHTML = join;
-        lastGameDiv.appendChild(joinRow);
+    const icon = card.querySelector('.game-head img');
+    const iconUrl = game.img_icon_url || '/image/game-icon.jpg';
+    if (icon && icon.getAttribute('src') !== iconUrl) {
+        icon.setAttribute('src', iconUrl);
     }
 
-    lastGameDiv.appendChild(gameInformation);
+    const title = card.querySelector('.last-game-title');
+    setText(title, game.name, false);
+    if (title) title.title = game.name ?? '';
 
-    markSelected(game.appid);
+    /* Классом на блоке, а не на самом индикаторе: так же, как у трека,
+       и CSS остаётся одним правилом на оба списка. */
+    card.classList.toggle('playing', Boolean(game.playingNow));
+
+    setText(document.getElementById('lg-forever'), game.playtime_forever, !switched);
+    setText(document.getElementById('lg-2weeks'), game.playtime_2weeks, !switched);
+    setText(document.getElementById('lg-last'), game.rtime_last_played, !switched);
+
+    showJoin(card, game);
+    setBannerImage(game.banner_url);
+
+    if (switched) replay(card, 'is-switching');
+
+    markSelected(key);
+}
+
+/* Ссылка на лобби — своей строкой под шапкой, а не рядом с названием:
+   в шапке она отъедала ширину, и длинные названия из-за неё переносились
+   на вторую строку.
+
+   Рисуем её, только когда Steam её дал: она появляется лишь у игр со своим
+   лобби и лишь пока в него пускают. Строка при этом есть всегда и просто
+   раскрывается и сворачивается: раньше она вставлялась рывком, и карточка
+   вздрагивала. В свёрнутом виде места она не занимает.
+   rel и target не нужны: steam:// открывает не вкладку, а сам клиент. */
+function showJoin(card, game) {
+    const row = card.querySelector('.game-join');
+    const link = card.querySelector('.join');
+    if (!row || !link) return;
+
+    if (game.joinUrl) link.setAttribute('href', game.joinUrl);
+    row.classList.toggle('shown', Boolean(game.joinUrl));
 }
 
 /* Подсветка в списке должна совпадать с тем, что показано крупно, иначе
    непонятно, чью статистику сейчас видишь. */
-function markSelected(appid) {
+function markSelected(key) {
     document.querySelectorAll('#game-lib .game').forEach(el => {
-        const active = String(el.dataset.appid) === String(appid);
+        const active = el.dataset.key === key;
         el.classList.toggle('is-active', active);
         el.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
 }
 
+function makeGameItem() {
+    /* Кнопка, а не div: таб, Enter и пробел начинают работать сами,
+       и не нужно городить обработчики клавиатуры руками. */
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'game';
+    el.innerHTML =
+        '<img alt="" loading="lazy">' +
+        '<div class="game-info">' +
+        '<div class="game-title"></div>' +
+        '<div class="playtime-forever"></div>' +
+        '</div>' +
+        '<span class="live">in game</span>';
+
+    /* Игру берём по ключу в момент клика, а не замыкаем при создании:
+       плитка живёт между опросами, и замкнутые данные устарели бы. */
+    el.addEventListener('click', () => {
+        const game = gamesByKey.get(el.dataset.key);
+        if (!game) return;
+        // клик по первой — снова «следить за самой свежей»
+        const first = document.querySelector('#game-lib .game');
+        selectedGameKey = first === el ? null : el.dataset.key;
+        showGame(game);
+    });
+    return el;
+}
+
+function paintGameItem(el, game, animate) {
+    el.dataset.key = gameKey(game);
+
+    const img = el.querySelector('img');
+    const icon = game.img_icon_url ?? '';
+    // src трогаем только при смене, иначе иконка моргает на каждом опросе
+    if (img.getAttribute('src') !== icon) img.setAttribute('src', icon);
+
+    const title = el.querySelector('.game-title');
+    setText(title, game.name, false);
+    title.title = game.name ?? '';
+
+    setText(el.querySelector('.playtime-forever'), game.playtime_forever, animate);
+    el.classList.toggle('playing', Boolean(game.playingNow));
+}
+
+/* Плитки переиспользуются по ключу игры. Если порядок поменялся — например,
+   запущенная игра поднялась наверх, — плитки доезжают до новых мест,
+   а не перескакивают. */
 function displayGameLib(data) {
     const gameLib = document.getElementById('game-lib');
-    gameLib.innerHTML = ``;
+    if (!gameLib) return;
 
-    data.forEach(game => {
-        /* Кнопка, а не div: таб, Enter и пробел начинают работать сами,
-           и не нужно городить обработчики клавиатуры руками. */
-        const gameElement = document.createElement('button');
-        gameElement.type = 'button';
-        gameElement.classList.add('game');
-        gameElement.dataset.appid = game.appid;
+    // сообщение об ошибке с прошлой попытки больше не нужно
+    Array.from(gameLib.children).forEach(child => {
+        if (!child.classList.contains('game')) child.remove();
+    });
 
-        gameElement.innerHTML = `
-                    <img src="${esc(game.img_icon_url)}" alt="" loading="lazy">
-                    <div class="game-info">
-                        <div class="game-title" title="${esc(game.name)}">${esc(game.name)}</div>
-                        <div class="playtime-forever">${esc(game.playtime_forever)}</div>
-                    </div>
-                    <span class="live">in game</span>`;
-        gameElement.classList.toggle('playing', Boolean(game.playingNow));
-        gameElement.addEventListener('click', () => showGame(game));
-        gameLib.appendChild(gameElement);
-    })
+    const existing = new Map();
+    const before = new Map();
+    Array.from(gameLib.children).forEach(el => {
+        existing.set(el.dataset.key, el);
+        before.set(el.dataset.key, el.getBoundingClientRect().top);
+    });
+    const firstPaint = existing.size === 0;
+
+    data.forEach((game, i) => {
+        const key = gameKey(game);
+        let el = existing.get(key);
+        const fresh = !el;
+        if (fresh) {
+            el = makeGameItem();
+        } else {
+            existing.delete(key);
+        }
+        paintGameItem(el, game, !fresh);
+        if (gameLib.children[i] !== el) {
+            gameLib.insertBefore(el, gameLib.children[i] || null);
+        }
+        if (fresh && !firstPaint) el.classList.add('is-new');
+    });
+    existing.forEach(el => el.remove());
+
+    if (firstPaint || reducedMotion()) return;
+    gameLib.querySelectorAll('.game').forEach(el => {
+        const was = before.get(el.dataset.key);
+        if (was === undefined) return;
+        const shift = was - el.getBoundingClientRect().top;
+        if (Math.abs(shift) < 1) return;
+        el.animate(
+            [{ transform: `translateY(${shift}px)` }, { transform: 'none' }],
+            { duration: 420, easing: 'cubic-bezier(.2, .7, .2, 1)' }
+        );
+    });
 }
 
 function displayTotalHours() {
-    const totalHoursEl = document.getElementById('playtime-in-total');
-    if (!totalHoursEl) return;
-
-    totalHoursEl.innerHTML = '';
+    const num = document.querySelector('#playtime-in-total .num');
+    const unit = document.querySelector('#playtime-in-total .unit');
+    if (!num) return;
 
     fetch('games-total-hours')
         .then(resp => {
@@ -506,34 +647,63 @@ function displayTotalHours() {
         })
         .then(data => {
             const trimmed = data.trim();
-            const num = Number(trimmed);
-            const display = Number.isFinite(num) ? num.toLocaleString(undefined, { maximumFractionDigits: 2 }) : trimmed;
-            totalHoursEl.innerHTML = `
-                <img src="/image/clock.png" alt="" aria-hidden="true">
-                <h2 class="playtime">all time: <span class="num">${esc(display)}</span> h</h2>
-            `;
+            const value = Number(trimmed);
+            const display = Number.isFinite(value)
+                ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                : trimmed;
+            setText(num, display, true);
+            if (unit) unit.hidden = false;
         })
         .catch(err => {
             console.error(err);
-            totalHoursEl.innerHTML = `<h2 class="playtime">all time: <span class="num">unavailable</span></h2>`;
+            // уже показанное число лучше, чем «unavailable» из-за одного сбоя
+            if (num.textContent === '--') setText(num, 'unavailable', false);
         });
 }
 
+/* Баннер меняется, только когда сменилась картинка. Новый сначала
+   докачивается целиком и лишь потом проявляется поверх старого, а старый
+   гаснет под ним: без этого между ними мелькала пустая карточка. */
+let bannerWanted = null;
+
 function setBannerImage(imageUrl) {
-    const lastGame = document.getElementById('last-game');
+    const card = document.getElementById('last-game');
+    if (!card) return;
 
-    const oldBanner = lastGame.querySelector('.banner-image');
-    if (oldBanner) oldBanner.remove();
+    const wanted = imageUrl || '';
+    if (wanted === bannerWanted) return;
+    bannerWanted = wanted;
 
-    const banner = document.createElement('div');
-    banner.className = 'banner-image';
-    banner.style.backgroundImage = `url('${imageUrl}')`;
+    const swap = () => {
+        // пока грузилась, успели попросить другую — эта уже не нужна
+        if (bannerWanted !== wanted) return;
 
-    lastGame.insertBefore(banner, lastGame.firstChild);
+        card.querySelectorAll('.banner-image').forEach(old => {
+            if (old.classList.contains('leaving')) return;
+            old.classList.add('leaving');
+            old.style.opacity = '0';
+            setTimeout(() => old.remove(), 900);
+        });
+        if (!wanted) return;
 
-    setTimeout(() => {
-        banner.style.opacity = '1';
-    }, 10);
+        const banner = document.createElement('div');
+        banner.className = 'banner-image';
+        banner.style.backgroundImage = `url("${wanted.replace(/["\\]/g, '\\$&')}")`;
+        // после старых, чтобы новый проявлялся поверх, а не под ними
+        card.insertBefore(banner, card.querySelector('.game-head'));
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            banner.style.opacity = '1';
+        }));
+    };
+
+    if (!wanted) {
+        swap();
+        return;
+    }
+    const probe = new Image();
+    probe.onload = swap;
+    probe.onerror = swap;
+    probe.src = wanted;
 }
 
 displayMyGameLib();
@@ -584,23 +754,27 @@ function displayPresence() {
         .then(response => (response.status === 204 ? null : response.json()))
         .then(data => {
             if (!data || !data.game || gamePlaying) {
-                row.hidden = true;
+                row.classList.remove('shown');
                 return;
             }
-            name.textContent = data.game;
+            /* Строка раскрывается плавно, а не выпрыгивает: блок под ней
+               сдвигается вниз вместе с ней, без рывка. Если игра сменилась,
+               пока строка уже видна, вспыхивает только название. */
+            setText(name, data.game, row.classList.contains('shown'));
             /* details Discord заполняет не у всех игр — тогда подсказка
                повторяет название, и это лучше пустого title. */
             name.title = data.details || data.game;
-            row.hidden = false;
+            row.classList.add('shown');
         })
         .catch(() => {
             /* Сервис чужой: замолчал — просто не показываем строку,
                а не пишем об этом на странице. */
-            row.hidden = true;
+            row.classList.remove('shown');
         });
 }
 
-displayPresence();
+/* Первый запрос делает загрузка списка игр: без неё неизвестно, играю ли
+   в Steam, и строка могла бы мелькнуть зря. */
 /* Тот же темп, что у списка игр в простое: статус должен гаснуть без
    большой задержки, но чужой сервис дёргать чаще незачем. */
 setInterval(() => {

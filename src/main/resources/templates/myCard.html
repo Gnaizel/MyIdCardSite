@@ -208,28 +208,36 @@
             <!-- Игры не из Steam. Скрыта, пока не играю во что-то, чего нет
                  в списке ниже: у такой игры нет ни карточки, ни часов —
                  показать её больше негде. -->
-            <p class="playing-now" id="playing-now" hidden>
-                <span class="live">in game</span>
-                <span class="playing-now-game" id="playing-now-game"></span>
+            <p class="playing-now" id="playing-now">
+                <span class="playing-now-inner">
+                    <span class="live">in game</span>
+                    <span class="playing-now-game" id="playing-now-game"></span>
+                </span>
             </p>
 
+            <!-- Карточка собрана здесь целиком, скрипт только меняет в ней
+                 значения: так опрос не пересобирает её и она не мигает. -->
             <div class="panel-body game-bar">
                 <div class="game-left-section">
                     <div id="last-game" class="last-game">
                         <div class="game-head">
                             <img src="/image/game-icon.jpg" alt="" aria-hidden="true">
                             <h2 class="last-game-title">loading…</h2>
+                            <span class="live">in game</span>
+                        </div>
+                        <div class="game-join">
+                            <div class="game-join-inner"><a class="join" href="#">join</a></div>
                         </div>
                         <div class="game-information">
-                            <h3 class="playtime-forever">playtime forever: --</h3>
-                            <h3 class="playtime-2weeks">playtime 2 weeks: --</h3>
-                            <h3 class="playtime-sessions">last played: --</h3>
+                            <h3 class="playtime-forever"><span>playtime forever: <span id="lg-forever">--</span></span></h3>
+                            <h3 class="playtime-2weeks"><span>playtime 2 weeks: <span id="lg-2weeks">--</span></span></h3>
+                            <h3 class="playtime-sessions"><span>last played: <span id="lg-last">--</span></span></h3>
                         </div>
                     </div>
                     <div class="info-box">
                         <div id="playtime-in-total" class="playtime-in-total">
                             <img src="/image/clock.png" alt="" aria-hidden="true">
-                            <h2 class="playtime">all time: <span class="num">--</span></h2>
+                            <h2 class="playtime">all time: <span class="num">--</span><span class="unit" hidden> h</span></h2>
                         </div>
                     </div>
                 </div>
