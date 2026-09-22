@@ -6,6 +6,7 @@ import ru.gnaizel.dto.games.GOGSteamResponseDto;
 import ru.gnaizel.dto.games.GameDto;
 import ru.gnaizel.dto.games.NowPlayingDto;
 import ru.gnaizel.model.games.Game;
+import ru.gnaizel.model.games.TrackedGame;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -75,6 +76,27 @@ public class GameMapper {
         game.setImg_icon_url("/image/game-icon.jpg");
         game.setRtime_last_played(LocalDateTime.now(ZoneId.of("UTC+4")));
         return game;
+    }
+
+    /* Игра, часы которой считаем сами по Discord. Для страницы она ничем
+       не отличается от остальных: те же поля, только appid нет. Минуты —
+       насчитанное нами плюс стартовые часы из настроек, если они заданы. */
+    public static Game trackedToGame(TrackedGame tracked, int extraMinutes, long secondsTwoWeeks) {
+        Game game = new Game();
+        game.setAppid(0);
+        game.setName(tracked.getName());
+        game.setPlaytime_forever((int) (tracked.getSecondsPlayed() / 60) + extraMinutes);
+        game.setPlaytime_2weeks((int) (secondsTwoWeeks / 60));
+        game.setImg_icon_url(tracked.getIconUrl() != null ? tracked.getIconUrl() : "/image/game-icon.jpg");
+        game.setBanner_url(tracked.getBannerUrl());
+        game.setRtime_last_played(LocalDateTime.ofInstant(tracked.getLastPlayed(), ZoneId.of("UTC+4")));
+        return game;
+    }
+
+    /* Discord и Steam пишут одну и ту же игру по-разному: «VALORANT»
+       и «Valorant», с ™ и без, с двоеточием и без. Сравниваем по сути. */
+    public static String sameName(String name) {
+        return name == null ? "" : name.toLowerCase().replaceAll("[^\\p{L}\\p{N}]+", "");
     }
 
     public static Game fortniteToGame(FortniteStatsDto stats, String name, String icon, String banner) {

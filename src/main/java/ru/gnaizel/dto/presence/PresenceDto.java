@@ -23,4 +23,8 @@ public class PresenceDto {
 
     /** Подпись под названием: что именно делаю, если Discord уточнил. */
     private String details;
+
+    /** Приложение Discord, за которым он узнал игру: по нему берутся
+     *  её иконка и обложка. Бывает пустым у игр, найденных только по процессу. */
+    private String applicationId;
 }

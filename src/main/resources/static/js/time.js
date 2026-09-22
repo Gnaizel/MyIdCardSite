@@ -452,12 +452,9 @@ function displayMyGameLib() {
             /* Общие часы одни на весь блок и от выбранной игры не зависят,
                поэтому запрашиваются вместе со списком, а не на каждый клик. */
             displayTotalHours();
-            // индикатор Discord зависит от того, играю ли в Steam, — сверяем сразу
-            displayPresence();
         })
         .catch(err => {
             console.error("Ошибка при получении или отображении игр:", err);
-            displayPresence();
 
             /* Одна неудачная попытка не должна стирать уже нарисованный
                список: ошибку показываем, только если показывать больше нечего. */
@@ -708,10 +705,12 @@ function setBannerImage(imageUrl) {
 
 displayMyGameLib();
 /* Пока играет — опрашиваем чаще, в остальное время реже: список игр
-   меняется редко, а индикатор должен гаснуть без большой задержки.
+   меняется редко, а индикатор должен загораться и гаснуть без большой
+   задержки. Простой — минута, а не две: игры не из Steam теперь тоже
+   загораются через этот опрос, а не через отдельную строку Discord.
    Скрытая вкладка не опрашивает вовсе. */
 const GAME_POLL_PLAYING = 30000;
-const GAME_POLL_IDLE = 120000;
+const GAME_POLL_IDLE = 60000;
 let gameTimer = null;
 let gamePlaying = false;
 
@@ -734,82 +733,6 @@ document.addEventListener('visibilitychange', () => {
 });
 
 scheduleGames();
-
-/* Во что играю прямо сейчас — по презенсу Discord.
-
-   Нужно для игр, которых нет в Steam. У Riot живого статуса для Valorant
-   не отдаёт ни одна открытая ручка: в официальном API его нет, а внутренняя
-   просит токены, которые добываются только из запущенного клиента. Discord
-   же определяет запущенную игру сам, и его презенс приходит обычным GET.
-
-   Показываем только для игр, которых в списке нет: если играю в игру из
-   списка, индикатор горит на её карточке, и второй такой же рядом — шум.
-   Одного «Steam молчит» для этого мало: Discord замечает запуск раньше,
-   чем Steam отдаёт статус, и строка успевала вспыхнуть с игрой из списка,
-   а потом переехать на карточку. */
-let presenceNudged = null;
-
-// ™, двоеточия и регистр у Discord и Steam расходятся — сравниваем по сути
-function sameGameName(name) {
-    return String(name ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
-}
-
-function isLibraryGame(name) {
-    const wanted = sameGameName(name);
-    if (!wanted) return false;
-    for (const game of gamesByKey.values()) {
-        if (sameGameName(game.name) === wanted) return true;
-    }
-    return false;
-}
-
-function displayPresence() {
-    const row = document.getElementById('playing-now');
-    const name = document.getElementById('playing-now-game');
-    if (!row || !name) return;
-
-    fetch('/presence')
-        // 204 — «не играю»: тела нет вовсе, разбирать нечего
-        .then(response => (response.status === 204 ? null : response.json()))
-        .then(data => {
-            if (!data || !data.game || gamePlaying || isLibraryGame(data.game)) {
-                row.classList.remove('shown');
-                /* Discord уже видит игру из списка, а Steam ещё нет — не ждём
-                   следующего опроса в две минуты, спрашиваем Steam сразу.
-                   Один раз на игру: иначе, пока Steam молчит, два опроса
-                   дёргали бы друг друга по кругу. */
-                const game = data && data.game;
-                if (game && !gamePlaying && isLibraryGame(game) && presenceNudged !== game) {
-                    presenceNudged = game;
-                    displayMyGameLib();
-                    scheduleGames();
-                }
-                if (!game) presenceNudged = null;
-                return;
-            }
-            /* Строка раскрывается плавно, а не выпрыгивает: блок под ней
-               сдвигается вниз вместе с ней, без рывка. Если игра сменилась,
-               пока строка уже видна, вспыхивает только название. */
-            setText(name, data.game, row.classList.contains('shown'));
-            /* details Discord заполняет не у всех игр — тогда подсказка
-               повторяет название, и это лучше пустого title. */
-            name.title = data.details || data.game;
-            row.classList.add('shown');
-        })
-        .catch(() => {
-            /* Сервис чужой: замолчал — просто не показываем строку,
-               а не пишем об этом на странице. */
-            row.classList.remove('shown');
-        });
-}
-
-/* Первый запрос делает загрузка списка игр: без неё неизвестно, играю ли
-   в Steam, и строка могла бы мелькнуть зря. */
-/* Тот же темп, что у списка игр в простое: статус должен гаснуть без
-   большой задержки, но чужой сервис дёргать чаще незачем. */
-setInterval(() => {
-    if (!document.hidden) displayPresence();
-}, 45000);
 
 /* Гостевая книга. Постмодерация: сообщение видно сразу, спрятать его может
    только владелец ключом. Всё, что пришло с сервера, уходит в DOM через esc(). */

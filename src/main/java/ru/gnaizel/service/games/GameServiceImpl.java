@@ -10,16 +10,27 @@ import ru.gnaizel.dto.games.GameDto;
 import ru.gnaizel.dto.games.NowPlayingDto;
 import ru.gnaizel.exception.GameFiltrationError;
 import ru.gnaizel.mapper.game.GameMapper;
+import ru.gnaizel.dto.presence.PresenceDto;
 import ru.gnaizel.model.games.Game;
+import ru.gnaizel.model.games.TrackedGame;
+import ru.gnaizel.repository.games.TrackedGameDayRepository;
+import ru.gnaizel.repository.games.TrackedGameRepository;
 import ru.gnaizel.service.games.client.FortniteAPIClient;
 import ru.gnaizel.service.games.client.SteamAPIClient;
+import ru.gnaizel.service.presence.PresenceService;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -38,6 +49,16 @@ public class GameServiceImpl implements GameService {
 
     private final SteamAPIClient steamAPIClient;
     private final FortniteAPIClient fortniteAPIClient;
+    private final PresenceService presenceService;
+    private final TrackedGameRepository trackedGames;
+    private final TrackedGameDayRepository trackedDays;
+
+    /* Стартовые часы для игр, которые считаем по Discord: «VALORANT=512;
+       Other Game=10». Своих часов за всё время у этих игр не узнать ни из
+       какого API, поэтому начальное число задаётся руками — например,
+       подсмотренное на tracker.gg, — а дальше растёт само. */
+    @Value("${discord.hours:}")
+    private String startHours;
 
     @Value("${steam.recent-limit:12}")
     private int limit;
@@ -77,6 +98,21 @@ public class GameServiceImpl implements GameService {
         library.fortnite().ifPresent(stats -> games.add(
                 GameMapper.fortniteToGame(stats, fortniteTitle, fortniteIcon, fortniteBanner)));
 
+        /* Игры, часы которых считаем сами по Discord, встают в тот же
+           список наравне со всеми. Если игру с тех пор купил в Steam,
+           её ведёт Steam, и второй карточки не будет. */
+        Set<String> known = namesCountedElsewhere(library);
+        LocalDate twoWeeksAgo = LocalDate.now(ZoneId.of("UTC+4")).minusDays(13);
+        Map<String, Integer> extra = startMinutes();
+        for (TrackedGame tracked : trackedGames.findAll()) {
+            String key = GameMapper.sameName(tracked.getName());
+            if (known.contains(key)) {
+                continue;
+            }
+            games.add(GameMapper.trackedToGame(tracked, extra.getOrDefault(key, 0),
+                    trackedDays.secondsSince(tracked.getName(), twoWeeksAgo)));
+        }
+
         games.sort(Comparator.comparing(Game::getRtime_last_played).reversed());
 
         /* Запущенную игру поднимаем наверх независимо от того, что записано
@@ -96,12 +132,31 @@ public class GameServiceImpl implements GameService {
             }
         });
 
+        /* У игр без appid (Fortnite и всё, что считаем по Discord) узнать,
+           запущены ли они, можно только у Discord. Спрашиваем, только если
+           Steam молчит: одновременно в две игры не играют. */
+        String discordGame = now.isPresent() ? "" : presenceService.nowPlaying()
+                .map(PresenceDto::getGame)
+                .map(GameMapper::sameName)
+                .orElse("");
+        if (!discordGame.isEmpty()) {
+            for (int i = 0; i < games.size(); i++) {
+                Game game = games.get(i);
+                if (game.getAppid() == 0 && GameMapper.sameName(game.getName()).equals(discordGame)) {
+                    games.add(0, games.remove(i));
+                    break;
+                }
+            }
+        }
+
         int playingAppid = now.map(NowPlayingDto::getAppid).orElse(-1);
         String joinUrl = now.map(NowPlayingDto::getJoinUrl).orElse(null);
         List<GameDto> recent = games.stream()
                 .limit(limit)
                 .map(game -> {
-                    boolean playing = game.getAppid() == playingAppid;
+                    boolean playing = game.getAppid() != 0
+                            ? game.getAppid() == playingAppid
+                            : !discordGame.isEmpty() && GameMapper.sameName(game.getName()).equals(discordGame);
                     return GameMapper.gameToGameDto(game, playing, playing ? joinUrl : null);
                 })
                 .toList();
@@ -134,7 +189,51 @@ public class GameServiceImpl implements GameService {
                 .map(FortniteStatsDto::getMinutesPlayed)
                 .orElse(0);
 
-        return (steamMinutes + fortniteMinutes) / 60;
+        Set<String> known = namesCountedElsewhere(library);
+        Map<String, Integer> extra = startMinutes();
+        double trackedMinutes = trackedGames.findAll().stream()
+                .filter(tracked -> !known.contains(GameMapper.sameName(tracked.getName())))
+                .mapToDouble(tracked -> tracked.getSecondsPlayed() / 60.0
+                        + extra.getOrDefault(GameMapper.sameName(tracked.getName()), 0))
+                .sum();
+
+        return (steamMinutes + fortniteMinutes + trackedMinutes) / 60;
+    }
+
+    @Override
+    public boolean countedElsewhere(String name) {
+        return namesCountedElsewhere(library()).contains(GameMapper.sameName(name));
+    }
+
+    /* Всё, что ведут Steam и Fortnite API. Сюда же игра, запущенная в Steam
+       прямо сейчас: при первом запуске её ещё нет в библиотеке, и без этого
+       Discord-счётчик завёл бы ей вторую карточку. */
+    private Set<String> namesCountedElsewhere(Library library) {
+        Set<String> names = new HashSet<>();
+        library.steam().forEach(game -> names.add(GameMapper.sameName(game.getName())));
+        if (library.fortnite().isPresent()) {
+            names.add(GameMapper.sameName(fortniteTitle));
+        }
+        steamAPIClient.getNowPlaying().ifPresent(playing -> names.add(GameMapper.sameName(playing.getName())));
+        names.remove("");
+        return names;
+    }
+
+    private Map<String, Integer> startMinutes() {
+        Map<String, Integer> minutes = new HashMap<>();
+        for (String pair : startHours.split(";")) {
+            int at = pair.lastIndexOf('=');
+            if (at <= 0) {
+                continue;
+            }
+            try {
+                double hours = Double.parseDouble(pair.substring(at + 1).trim().replace(',', '.'));
+                minutes.put(GameMapper.sameName(pair.substring(0, at)), (int) Math.round(hours * 60));
+            } catch (NumberFormatException e) {
+                log.warn("GAMES: не понял стартовые часы «{}», пропускаю", pair.trim());
+            }
+        }
+        return minutes;
     }
 
     private Library library() {

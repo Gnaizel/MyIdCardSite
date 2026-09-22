@@ -107,6 +107,7 @@ public class DiscordPresenceServiceImpl implements PresenceService {
                        Presence там пусто, и это нормально — название игры
                        и есть весь ответ. */
                     .details(emptyToNull(activity.path("details").asText(null)))
+                    .applicationId(emptyToNull(activity.path("application_id").asText(null)))
                     .build();
         }
         return null;

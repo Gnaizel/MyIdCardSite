@@ -574,8 +574,7 @@ a:hover { color: var(--accent); }
     color: var(--accent);
 }
 .game.playing .live,
-.last-game.playing .live,
-.playing-now .live {
+.last-game.playing .live {
     display: inline-flex;
     /* появляется из display: none — без проявления он выскакивал рывком */
     animation: fade-in .35s ease-out;
@@ -585,44 +584,6 @@ a:hover { color: var(--accent); }
     from { opacity: 0; }
 }
 
-/* Строка про игру не из Steam. У такой игры нет ни карточки, ни часов —
-   загореться индикатору негде, поэтому он стоит сам по себе под
-   подзаголовком блока. */
-.playing-now {
-    /* Строка раскрывается по высоте, а не появляется сразу: блок под ней
-       съезжает вниз плавно. 0fr → 1fr — единственный способ анимировать
-       высоту «по содержимому» без замеров в скрипте. */
-    display: grid;
-    grid-template-rows: 0fr;
-    margin-top: 0;
-    opacity: 0;
-    visibility: hidden;
-    font-size: 12.5px;
-    transition: grid-template-rows .4s ease, margin-top .4s ease,
-                opacity .3s ease, visibility 0s linear .4s;
-}
-.playing-now.shown {
-    grid-template-rows: 1fr;
-    margin-top: 6px;
-    opacity: 1;
-    visibility: visible;
-    transition: grid-template-rows .4s ease, margin-top .4s ease,
-                opacity .3s ease .1s, visibility 0s;
-}
-.playing-now-inner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 0;
-    overflow: hidden;
-}
-.playing-now-game {
-    color: var(--strong);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
 .live::before {
     content: "";
     width: 6px;
