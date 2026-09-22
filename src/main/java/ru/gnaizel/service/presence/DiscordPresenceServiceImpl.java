@@ -49,6 +49,12 @@ public class DiscordPresenceServiceImpl implements PresenceService {
     private volatile PresenceDto cached;
     private volatile Instant cachedAt;
 
+    /* О чём жаловались в прошлый раз. Нужно, чтобы не повторять одно и то же
+       в логе каждые полминуты: «владелец не вступил в сервер Lanyard» —
+       состояние настройки, а не событие, и писать его без конца незачем.
+       А вот смену причины пропускать нельзя, отсюда сравнение, а не флаг. */
+    private volatile String lastComplaint;
+
     @Value("${discord.user-id:}")
     private String userId;
 
@@ -74,16 +80,18 @@ public class DiscordPresenceServiceImpl implements PresenceService {
         try {
             body = template.getForObject(PRESENCE_URL.formatted(userId), JsonNode.class);
         } catch (RestClientException e) {
-            log.warn("DISCORD: не забрал презенс: {}", e.getMessage());
+            complain("не забрал презенс: " + e.getMessage());
             return null;
         }
 
         if (body == null || !body.path("success").asBoolean()) {
-            /* Чаще всего это значит, что владелец не состоит в сервере
-               Lanyard: без этого его бот презенса не видит. */
-            log.warn("DISCORD: презенс не отдан — проверь, что пользователь виден сервису");
+            /* Самая частая причина — user_not_monitored: владелец не состоит
+               в сервере Lanyard, и бот его презенса не видит. */
+            String code = body == null ? "пустой ответ" : body.path("error").path("code").asText("неизвестно");
+            complain("презенс не отдан (" + code + ")");
             return null;
         }
+        lastComplaint = null;
 
         for (JsonNode activity : body.path("data").path("activities")) {
             if (activity.path("type").asInt(-1) != PLAYING) {
@@ -102,6 +110,15 @@ public class DiscordPresenceServiceImpl implements PresenceService {
                     .build();
         }
         return null;
+    }
+
+    /* Одна и та же жалоба пишется один раз: сервис опрашивается постоянно,
+       и неизменная причина превратила бы лог в ленту повторов. */
+    private void complain(String reason) {
+        if (!reason.equals(lastComplaint)) {
+            log.warn("DISCORD: {}", reason);
+            lastComplaint = reason;
+        }
     }
 
     private static String emptyToNull(String value) {
