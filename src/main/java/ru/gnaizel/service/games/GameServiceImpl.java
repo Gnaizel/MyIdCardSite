@@ -12,25 +12,23 @@ import ru.gnaizel.exception.GameFiltrationError;
 import ru.gnaizel.mapper.game.GameMapper;
 import ru.gnaizel.dto.presence.PresenceDto;
 import ru.gnaizel.model.games.Game;
-import ru.gnaizel.model.games.TrackedGame;
-import ru.gnaizel.repository.games.TrackedGameDayRepository;
-import ru.gnaizel.repository.games.TrackedGameRepository;
 import ru.gnaizel.service.games.client.FortniteAPIClient;
 import ru.gnaizel.service.games.client.SteamAPIClient;
+import ru.gnaizel.service.presence.DiscordAppArt;
 import ru.gnaizel.service.presence.PresenceService;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -50,15 +48,16 @@ public class GameServiceImpl implements GameService {
     private final SteamAPIClient steamAPIClient;
     private final FortniteAPIClient fortniteAPIClient;
     private final PresenceService presenceService;
-    private final TrackedGameRepository trackedGames;
-    private final TrackedGameDayRepository trackedDays;
+    private final DiscordAppArt appArt;
 
-    /* Стартовые часы для игр, которые считаем по Discord: «VALORANT=512;
-       Other Game=10». Своих часов за всё время у этих игр не узнать ни из
-       какого API, поэтому начальное число задаётся руками — например,
-       подсмотренное на tracker.gg, — а дальше растёт само. */
-    @Value("${discord.hours:}")
-    private String startHours;
+    /* Discord считает «игрой» любую программу, которую узнал, в том числе
+       IDE и плееры. Такие в список игр попадать не должны. */
+    @Value("${discord.ignore:}")
+    private String ignore;
+
+    /* Оформление приложения Discord не меняется, а страница опрашивает
+       список часто — спрашиваем его один раз на приложение. */
+    private final Map<String, DiscordAppArt.Art> art = new ConcurrentHashMap<>();
 
     @Value("${steam.recent-limit:12}")
     private int limit;
@@ -98,21 +97,6 @@ public class GameServiceImpl implements GameService {
         library.fortnite().ifPresent(stats -> games.add(
                 GameMapper.fortniteToGame(stats, fortniteTitle, fortniteIcon, fortniteBanner)));
 
-        /* Игры, часы которых считаем сами по Discord, встают в тот же
-           список наравне со всеми. Если игру с тех пор купил в Steam,
-           её ведёт Steam, и второй карточки не будет. */
-        Set<String> known = namesCountedElsewhere(library);
-        LocalDate twoWeeksAgo = LocalDate.now(ZoneId.of("UTC+4")).minusDays(13);
-        Map<String, Integer> extra = startMinutes();
-        for (TrackedGame tracked : trackedGames.findAll()) {
-            String key = GameMapper.sameName(tracked.getName());
-            if (known.contains(key)) {
-                continue;
-            }
-            games.add(GameMapper.trackedToGame(tracked, extra.getOrDefault(key, 0),
-                    trackedDays.secondsSince(tracked.getName(), twoWeeksAgo)));
-        }
-
         games.sort(Comparator.comparing(Game::getRtime_last_played).reversed());
 
         /* Запущенную игру поднимаем наверх независимо от того, что записано
@@ -132,18 +116,19 @@ public class GameServiceImpl implements GameService {
             }
         });
 
-        /* У игр без appid (Fortnite и всё, что считаем по Discord) узнать,
+        /* У игр без appid (Fortnite и всё, чего нет в Steam) узнать,
            запущены ли они, можно только у Discord. Спрашиваем, только если
            Steam молчит: одновременно в две игры не играют. */
-        String discordGame = now.isPresent() ? "" : presenceService.nowPlaying()
-                .map(PresenceDto::getGame)
-                .map(GameMapper::sameName)
-                .orElse("");
+        Optional<PresenceDto> presence = now.isPresent() ? Optional.empty() : presenceService.nowPlaying()
+                .filter(p -> !ignored(p.getGame()));
+        String discordGame = presence.map(PresenceDto::getGame).map(GameMapper::sameName).orElse("");
+        boolean discordInList = false;
         if (!discordGame.isEmpty()) {
             for (int i = 0; i < games.size(); i++) {
                 Game game = games.get(i);
                 if (game.getAppid() == 0 && GameMapper.sameName(game.getName()).equals(discordGame)) {
                     games.add(0, games.remove(i));
+                    discordInList = true;
                     break;
                 }
             }
@@ -151,15 +136,29 @@ public class GameServiceImpl implements GameService {
 
         int playingAppid = now.map(NowPlayingDto::getAppid).orElse(-1);
         String joinUrl = now.map(NowPlayingDto::getJoinUrl).orElse(null);
-        List<GameDto> recent = games.stream()
-                .limit(limit)
+        List<GameDto> recent = new ArrayList<>(games.stream()
                 .map(game -> {
                     boolean playing = game.getAppid() != 0
                             ? game.getAppid() == playingAppid
                             : !discordGame.isEmpty() && GameMapper.sameName(game.getName()).equals(discordGame);
                     return GameMapper.gameToGameDto(game, playing, playing ? joinUrl : null);
                 })
-                .toList();
+                .toList());
+
+        /* Игру, которой нет ни в Steam, ни в Fortnite API, знает только
+           Discord и только пока она запущена. Показываем её, пока идёт,
+           ровно тем, что он отдал, — после выхода карточка пропадает. */
+        if (presence.isPresent() && !discordInList
+                && !namesCountedElsewhere(library).contains(discordGame)) {
+            PresenceDto playing = presence.get();
+            Optional<DiscordAppArt.Art> found = artFor(playing.getApplicationId());
+            recent.add(0, GameMapper.presenceToGameDto(playing.getGame(),
+                    found.map(DiscordAppArt.Art::icon).orElse(null),
+                    found.map(DiscordAppArt.Art::banner).orElse(null)));
+        }
+        if (recent.size() > limit) {
+            recent = recent.subList(0, limit);
+        }
 
         if (recent.isEmpty()) {
             throw new GameFiltrationError("ERROR IN getRecentlyGames: games list is empty");
@@ -189,25 +188,11 @@ public class GameServiceImpl implements GameService {
                 .map(FortniteStatsDto::getMinutesPlayed)
                 .orElse(0);
 
-        Set<String> known = namesCountedElsewhere(library);
-        Map<String, Integer> extra = startMinutes();
-        double trackedMinutes = trackedGames.findAll().stream()
-                .filter(tracked -> !known.contains(GameMapper.sameName(tracked.getName())))
-                .mapToDouble(tracked -> tracked.getSecondsPlayed() / 60.0
-                        + extra.getOrDefault(GameMapper.sameName(tracked.getName()), 0))
-                .sum();
-
-        return (steamMinutes + fortniteMinutes + trackedMinutes) / 60;
+        return (steamMinutes + fortniteMinutes) / 60;
     }
 
-    @Override
-    public boolean countedElsewhere(String name) {
-        return namesCountedElsewhere(library()).contains(GameMapper.sameName(name));
-    }
-
-    /* Всё, что ведут Steam и Fortnite API. Сюда же игра, запущенная в Steam
-       прямо сейчас: при первом запуске её ещё нет в библиотеке, и без этого
-       Discord-счётчик завёл бы ей вторую карточку. */
+    /* Всё, что ведут Steam и Fortnite API: такой игре карточка от Discord
+       не нужна, у неё уже есть своя. */
     private Set<String> namesCountedElsewhere(Library library) {
         Set<String> names = new HashSet<>();
         library.steam().forEach(game -> names.add(GameMapper.sameName(game.getName())));
@@ -219,21 +204,27 @@ public class GameServiceImpl implements GameService {
         return names;
     }
 
-    private Map<String, Integer> startMinutes() {
-        Map<String, Integer> minutes = new HashMap<>();
-        for (String pair : startHours.split(";")) {
-            int at = pair.lastIndexOf('=');
-            if (at <= 0) {
-                continue;
-            }
-            try {
-                double hours = Double.parseDouble(pair.substring(at + 1).trim().replace(',', '.'));
-                minutes.put(GameMapper.sameName(pair.substring(0, at)), (int) Math.round(hours * 60));
-            } catch (NumberFormatException e) {
-                log.warn("GAMES: не понял стартовые часы «{}», пропускаю", pair.trim());
-            }
+    /* Неудачный ответ не запоминаем: Discord мог просто не ответить,
+       и тогда на следующем опросе спросим снова. */
+    private Optional<DiscordAppArt.Art> artFor(String applicationId) {
+        if (applicationId == null) {
+            return Optional.empty();
         }
-        return minutes;
+        DiscordAppArt.Art known = art.get(applicationId);
+        if (known != null) {
+            return Optional.of(known);
+        }
+        Optional<DiscordAppArt.Art> found = appArt.find(applicationId);
+        found.ifPresent(value -> art.put(applicationId, value));
+        return found;
+    }
+
+    private boolean ignored(String name) {
+        Set<String> names = Arrays.stream(ignore.split(","))
+                .map(GameMapper::sameName)
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toSet());
+        return names.contains(GameMapper.sameName(name));
     }
 
     private Library library() {

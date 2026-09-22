@@ -114,14 +114,11 @@ discord:
   #   2. включить в Discord «Отображать текущую активность как статус».
   # Проверить: https://api.lanyard.rest/v1/users/<этот id>
   #
-  # Пустой — игры не из Steam не отслеживаются вовсе.
+  # Игра не из Steam показывается карточкой в начале списка, пока запущена,
+  # и без часов: их не отдаёт ни одно API, а сами мы ничего не считаем.
+  #
+  # Пустой — игры не из Steam не показываются вовсе.
   user-id: ${DISCORD_USER_ID:}
-  # Игры не из Steam (Valorant и т.п.) встают в общий список игр, а часы
-  # в них сервер считает сам, раз в минуту спрашивая Discord. Ни одно API
-  # не отдаёт, сколько в них наиграно за всё время, поэтому стартовое число
-  # можно задать руками (например, с tracker.gg): «VALORANT=512;Other=10».
-  # Название — как его пишет Discord, регистр и знаки не важны.
-  hours: ${DISCORD_GAME_HOURS:}
   # Discord зовёт «игрой» любую программу, которую узнал. Эти в список игр
   # не попадают. Через запятую.
   ignore: ${DISCORD_IGNORE:Visual Studio Code,Visual Studio,IntelliJ IDEA,IntelliJ IDEA Ultimate,IntelliJ IDEA Community Edition,PyCharm,Rider,WebStorm,CLion,DataGrip,Android Studio,Spotify,YouTube,YouTube Music,Twitch,Netflix,Crunchyroll,OBS Studio,Wallpaper Engine}
