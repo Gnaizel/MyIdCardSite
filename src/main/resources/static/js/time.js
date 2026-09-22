@@ -518,10 +518,10 @@ function showGame(game) {
    в шапке она отъедала ширину, и длинные названия из-за неё переносились
    на вторую строку.
 
-   Рисуем её, только когда Steam её дал: она появляется лишь у игр со своим
-   лобби и лишь пока в него пускают. Строка при этом есть всегда и просто
-   раскрывается и сворачивается: раньше она вставлялась рывком, и карточка
-   вздрагивала. В свёрнутом виде места она не занимает.
+   Показываем её, только когда Steam её дал: она появляется лишь у игр со
+   своим лобби и лишь пока в него пускают. Сама ссылка есть всегда и только
+   проявляется и гаснет, а места в вёрстке не занимает (см. CSS): раньше
+   она вставлялась рывком, и текст карточки съезжал вниз.
    rel и target не нужны: steam:// открывает не вкладку, а сам клиент. */
 function showJoin(card, game) {
     const row = card.querySelector('.game-join');
@@ -742,8 +742,27 @@ scheduleGames();
    просит токены, которые добываются только из запущенного клиента. Discord
    же определяет запущенную игру сам, и его презенс приходит обычным GET.
 
-   Показываем, только когда Steam молчит: если играю в игру из списка,
-   индикатор уже горит на её карточке, и второй такой же рядом — шум. */
+   Показываем только для игр, которых в списке нет: если играю в игру из
+   списка, индикатор горит на её карточке, и второй такой же рядом — шум.
+   Одного «Steam молчит» для этого мало: Discord замечает запуск раньше,
+   чем Steam отдаёт статус, и строка успевала вспыхнуть с игрой из списка,
+   а потом переехать на карточку. */
+let presenceNudged = null;
+
+// ™, двоеточия и регистр у Discord и Steam расходятся — сравниваем по сути
+function sameGameName(name) {
+    return String(name ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function isLibraryGame(name) {
+    const wanted = sameGameName(name);
+    if (!wanted) return false;
+    for (const game of gamesByKey.values()) {
+        if (sameGameName(game.name) === wanted) return true;
+    }
+    return false;
+}
+
 function displayPresence() {
     const row = document.getElementById('playing-now');
     const name = document.getElementById('playing-now-game');
@@ -753,8 +772,19 @@ function displayPresence() {
         // 204 — «не играю»: тела нет вовсе, разбирать нечего
         .then(response => (response.status === 204 ? null : response.json()))
         .then(data => {
-            if (!data || !data.game || gamePlaying) {
+            if (!data || !data.game || gamePlaying || isLibraryGame(data.game)) {
                 row.classList.remove('shown');
+                /* Discord уже видит игру из списка, а Steam ещё нет — не ждём
+                   следующего опроса в две минуты, спрашиваем Steam сразу.
+                   Один раз на игру: иначе, пока Steam молчит, два опроса
+                   дёргали бы друг друга по кругу. */
+                const game = data && data.game;
+                if (game && !gamePlaying && isLibraryGame(game) && presenceNudged !== game) {
+                    presenceNudged = game;
+                    displayMyGameLib();
+                    scheduleGames();
+                }
+                if (!game) presenceNudged = null;
                 return;
             }
             /* Строка раскрывается плавно, а не выпрыгивает: блок под ней

@@ -722,42 +722,38 @@ a:hover { color: var(--accent); }
 }
 
 .game-head,
-.game-join,
 .game-information { position: relative; z-index: 1; }
 
-/* Отдельная строка со ссылкой на лобби: прижата к правому краю и опущена
-   к часам, в пустую полосу под баннером. Свободное место забирает она,
-   поэтому у часов собственный отступ снимается — иначе пустота делилась бы
-   на двоих и ссылка зависала бы посреди карточки. */
+/* Ссылка на лобби: прижата к правому краю и висит в пустой полосе под
+   баннером, над часами. Она вынесена из потока — раньше она была своей
+   строкой, и когда приходила, карточка подрастала и текст съезжал вниз.
+   Теперь её появление не двигает ничего: она выезжает и проявляется
+   поверх полосы, которая и так пустая. */
 .game-join {
-    margin-top: auto;
-    /* Строка есть всегда, но свёрнута, пока ссылки нет. Отрицательный
-       нижний отступ съедает gap карточки, иначе пустая строка добавляла бы
-       зазор в карточку одиночной игры. Раскрывается и сворачивается
-       плавно — карточка больше не вздрагивает, когда ссылка приходит. */
-    display: grid;
-    grid-template-rows: 0fr;
-    margin-bottom: -12px;
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
     opacity: 0;
     visibility: hidden;
-    transition: grid-template-rows .4s ease, margin-bottom .4s ease,
-                opacity .3s ease, visibility 0s linear .4s;
+    transform: translateY(6px);
+    transition: opacity .45s ease, transform .45s cubic-bezier(.2, .7, .2, 1),
+                visibility 0s linear .45s;
 }
 .game-join.shown {
-    grid-template-rows: 1fr;
-    margin-bottom: 0;
     opacity: 1;
     visibility: visible;
-    transition: grid-template-rows .4s ease, margin-bottom .4s ease,
-                opacity .3s ease .1s, visibility 0s;
+    transform: none;
+    transition: opacity .45s ease, transform .45s cubic-bezier(.2, .7, .2, 1),
+                visibility 0s;
 }
-.game-join-inner {
-    display: flex;
-    justify-content: flex-end;
-    min-height: 0;
-    overflow: hidden;
+/* Пришла — один раз мягко вспыхивает, чтобы её заметили боковым зрением. */
+.game-join.shown .join { animation: join-glow 1.6s ease-out .2s; }
+
+@keyframes join-glow {
+    0%   { text-shadow: 0 0 0 transparent; }
+    30%  { text-shadow: 0 0 10px rgba(var(--accent-rgb), .8); }
+    100% { text-shadow: 0 0 0 transparent; }
 }
-.game-join + .game-information { margin-top: 0; }
 
 /* Выбрали другую игру — её шапка и цифры проявляются, а не подменяются
    в тот же кадр. */
