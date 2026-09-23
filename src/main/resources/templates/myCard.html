@@ -163,6 +163,26 @@
             </div>
         </section>
 
+        <!-- Лента появляется, только если сервер отдал хоть одно событие:
+             пустой журнал с заголовком выглядел бы поломкой. -->
+        <section class="panel card log-section" id="log-section" hidden>
+            <h2 class="panel-title">log</h2>
+            <p class="panel-sub">everything i do online &middot; newest first</p>
+            <div class="panel-body">
+                <div id="log-filters" class="log-filters" role="group" aria-label="filter by source"></div>
+                <div id="log-wrap" class="log-wrap">
+                    <div id="log-list" class="log-list"></div>
+                </div>
+                <button class="log-toggle" id="log-toggle" type="button"
+                        aria-expanded="false" aria-controls="log-list">
+                    <span>more</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+                </button>
+            </div>
+        </section>
+
         <section class="panel stack">
             <h2 class="panel-title">stack</h2>
             <div class="panel-body chips">

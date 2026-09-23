@@ -1198,3 +1198,165 @@ fetch('/tiktok')
     .then(response => response.json())
     .then(displayTikTok)
     .catch(err => console.error('Ошибка при получении репостов TikTok:', err));
+
+/* ------------------------------------------------------------------ log --
+   Лента всего, что я делаю в сети. Сервер отдаёт готовые события из API
+   (GitHub, Last.fm, Steam, Fortnite), страница только раскладывает их по
+   дням и фильтрует по источнику — сама ничего не считает. */
+
+/* Порядок здесь — порядок фильтров над лентой. */
+const LOG_SOURCES = {
+    github: 'github',
+    lastfm: 'last.fm',
+    steam:  'steam',
+    epic:   'epic',
+};
+
+/* Что сделал: маркер и глагол. Глагол стоит перед предметом, поэтому
+   строка читается как запись в журнале: «★ starred owner/repo».
+   Число коммитов бывает неизвестно (force push) — тогда просто «pushed to». */
+const LOG_KINDS = {
+    push:    { mark: '↑', verb: e => e.count
+                   ? `pushed ${e.count} commit${e.count === 1 ? '' : 's'} to` : 'pushed to' },
+    repo:    { mark: '+', verb: () => 'created' },
+    star:    { mark: '★', verb: () => 'starred' },
+    fork:    { mark: '⑂', verb: () => 'forked' },
+    pr:      { mark: '⇄', verb: () => 'opened pr in' },
+    merge:   { mark: '✓', verb: () => 'merged pr in' },
+    issue:   { mark: '!', verb: () => 'opened issue in' },
+    release: { mark: '◆', verb: () => 'released' },
+    love:    { mark: '♥', verb: () => 'loved' },
+    play:    { mark: '▶', verb: () => 'played' },
+};
+
+const LOG_ZONE = 'Etc/GMT-4'; // это UTC+4: у Etc-зон знак наоборот
+const logState = { items: [], filter: 'all', raw: '' };
+
+function logDayKey(date) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: LOG_ZONE }).format(date);
+}
+
+function logDayLabel(date) {
+    const key = logDayKey(date);
+    const now = new Date();
+    if (key === logDayKey(now)) return 'today';
+    if (key === logDayKey(new Date(now.getTime() - 86400000))) return 'yesterday';
+    /* год пишем только у прошлогоднего: лайк трёхлетней давности иначе
+       выглядел бы как вчерашний */
+    const options = { timeZone: LOG_ZONE, day: 'numeric', month: 'short' };
+    if (key.slice(0, 4) !== logDayKey(now).slice(0, 4)) options.year = 'numeric';
+    return new Intl.DateTimeFormat('en-GB', options).format(date).toLowerCase();
+}
+
+function logTime(date) {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: LOG_ZONE, hour: '2-digit', minute: '2-digit' })
+        .format(date);
+}
+
+function logRow(event) {
+    const kind = LOG_KINDS[event.kind] || { mark: '·', verb: () => event.kind };
+    const date = new Date(event.at);
+    const tag = event.url ? 'a' : 'div';
+    const link = event.url ? ` href="${esc(event.url)}" target="_blank" rel="noopener"` : '';
+    const detail = event.detail ? `<span class="log-detail">${esc(event.detail)}</span>` : '';
+    return `<${tag} class="log-row" data-kind="${esc(event.kind)}"${link}>` +
+        `<span class="log-time">${logTime(date)}</span>` +
+        `<span class="log-src">${esc(LOG_SOURCES[event.source] || event.source)}</span>` +
+        `<span class="log-what"><span class="log-mark" aria-hidden="true">${kind.mark}</span>` +
+        `<span class="log-verb">${esc(kind.verb(event))}</span> ` +
+        `<span class="log-subject">${esc(event.subject)}</span>${detail}</span>` +
+        `</${tag}>`;
+}
+
+function renderLogFilters() {
+    const box = document.getElementById('log-filters');
+    const counts = {};
+    logState.items.forEach(e => { counts[e.source] = (counts[e.source] || 0) + 1; });
+    const sources = Object.keys(LOG_SOURCES).filter(s => counts[s]);
+    /* фильтр по источнику, которого больше нет в ленте, сбрасываем */
+    if (logState.filter !== 'all' && !counts[logState.filter]) logState.filter = 'all';
+
+    box.innerHTML = [['all', 'all', logState.items.length]]
+        .concat(sources.map(s => [s, LOG_SOURCES[s], counts[s]]))
+        .map(([key, label, n]) =>
+            `<button class="log-filter" type="button" data-source="${key}" ` +
+            `aria-pressed="${key === logState.filter}">${esc(label)}<span class="n">${n}</span></button>`)
+        .join('');
+}
+
+function renderLogList() {
+    const list = document.getElementById('log-list');
+    const wrap = document.getElementById('log-wrap');
+    const toggle = document.getElementById('log-toggle');
+    const shown = logState.items.filter(e => logState.filter === 'all' || e.source === logState.filter);
+
+    let html = '';
+    let day = '';
+    shown.forEach(event => {
+        const label = logDayLabel(new Date(event.at));
+        if (label !== day) {
+            html += `<div class="log-day">${esc(label)}</div>`;
+            day = label;
+        }
+        html += logRow(event);
+    });
+    list.innerHTML = html || '<p class="log-empty">nothing here yet</p>';
+
+    /* Кнопка «ещё» нужна, только если лента правда не влезла. */
+    const short = list.scrollHeight <= wrap.clientHeight + 4 && !wrap.classList.contains('expanded');
+    wrap.classList.toggle('short', short);
+    toggle.hidden = short && !wrap.classList.contains('expanded');
+}
+
+function displayLog(items) {
+    const section = document.getElementById('log-section');
+    const raw = JSON.stringify(items || []);
+    if (raw === logState.raw) return; // ничего не поменялось — не трогаем разметку
+    logState.raw = raw;
+    logState.items = (items || []).slice().sort((a, b) => new Date(b.at) - new Date(a.at));
+
+    section.hidden = logState.items.length === 0;
+    if (section.hidden) return;
+    renderLogFilters();
+    renderLogList();
+}
+
+function initLog() {
+    const filters = document.getElementById('log-filters');
+    const wrap = document.getElementById('log-wrap');
+    const toggle = document.getElementById('log-toggle');
+    if (!filters) return;
+
+    filters.addEventListener('click', event => {
+        const button = event.target.closest('.log-filter');
+        if (!button || button.dataset.source === logState.filter) return;
+        logState.filter = button.dataset.source;
+        filters.querySelectorAll('.log-filter').forEach(b =>
+            b.setAttribute('aria-pressed', String(b === button)));
+        wrap.scrollTop = 0;
+        renderLogList();
+    });
+
+    toggle.addEventListener('click', () => {
+        const open = wrap.classList.toggle('expanded');
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.querySelector('span').textContent = open ? 'less' : 'more';
+        if (!open) wrap.scrollTop = 0;
+    });
+}
+
+/* Сбой запроса ленту не трогает: один неудачный опрос не должен стирать
+   то, что уже показано. */
+function fetchLog() {
+    fetch('/log')
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(displayLog)
+        .catch(err => console.error('Ошибка при получении ленты:', err));
+}
+
+initLog();
+fetchLog();
+setInterval(fetchLog, 300000);

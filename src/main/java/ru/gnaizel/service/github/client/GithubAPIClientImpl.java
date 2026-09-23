@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
@@ -16,6 +17,8 @@ import ru.gnaizel.model.github.GithubGraphQlResponse;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -107,6 +110,14 @@ public class GithubAPIClientImpl implements GithubAPIClient {
               }
             }""";
 
+    /* Одна страница — последние сто событий. Старше тридцати дней GitHub
+       их всё равно не отдаёт, а на странице столько и не читают. */
+    private static final String EVENTS_URL = REST_URL + "/users/%s/events/public?per_page=100";
+
+    /* Как глубоко от головы пуша искать его начало. Пуш длиннее — редкость,
+       и тогда число коммитов просто не пишем. */
+    private static final int PUSH_DEPTH = 50;
+
     private final RestTemplate template = new RestTemplate();
 
     @Value("${github.api-token}")
@@ -166,6 +177,100 @@ public class GithubAPIClientImpl implements GithubAPIClient {
         return new LineStatsDto(totals[0], totals[1], totals[2] > 0);
     }
 
+    @Override
+    public JsonNode getPublicEvents() {
+        JsonNode events;
+        try {
+            events = template.exchange(EVENTS_URL.formatted(login), HttpMethod.GET,
+                    new HttpEntity<>(headers()), JsonNode.class).getBody();
+        } catch (RestClientException e) {
+            throw new GithubApiResponseException("GITHUB API ERROR: " + e.getMessage());
+        }
+        if (events == null || !events.isArray()) {
+            throw new GithubApiResponseException("GITHUB API ERROR: events are not a list");
+        }
+        return events;
+    }
+
+    /* Все пуши — одним запросом: на каждый свой псевдоним p0, p1… с головой
+       пуша и полусотней коммитов под ней. Позиция прежней головы в этом
+       списке и есть число коммитов в пуше. Значения идут переменными, а не
+       вклеиваются в текст запроса. */
+    @Override
+    public Map<String, PushInfo> describePushes(List<Push> pushes) {
+        if (pushes.isEmpty() || token == null || token.isBlank()) {
+            return Map.of();
+        }
+
+        StringBuilder params = new StringBuilder();
+        StringBuilder fields = new StringBuilder();
+        Map<String, Object> variables = new HashMap<>();
+        List<Push> asked = new ArrayList<>();
+        for (Push push : pushes) {
+            String[] parts = push.repo().split("/", 2);
+            if (parts.length != 2) {
+                continue;
+            }
+            int n = asked.size();
+            asked.add(push);
+            params.append("$o%1$d: String!, $n%1$d: String!, $h%1$d: GitObjectID!, ".formatted(n));
+            fields.append("""
+                      p%1$d: repository(owner: $o%1$d, name: $n%1$d) {
+                        defaultBranchRef { name }
+                        object(oid: $h%1$d) {
+                          ... on Commit { messageHeadline history(first: %2$d) { nodes { oid } } }
+                        }
+                      }
+                    """.formatted(n, PUSH_DEPTH));
+            variables.put("o" + n, parts[0]);
+            variables.put("n" + n, parts[1]);
+            variables.put("h" + n, push.head());
+        }
+        if (asked.isEmpty()) {
+            return Map.of();
+        }
+
+        JsonNode data = graphQlPartial("query(" + params + ") {\n" + fields + "}", variables);
+        Map<String, PushInfo> described = new HashMap<>();
+        for (int n = 0; n < asked.size(); n++) {
+            JsonNode repo = data.path("p" + n);
+            JsonNode commit = repo.path("object");
+            if (!commit.hasNonNull("messageHeadline")) {
+                continue;
+            }
+            List<String> history = new ArrayList<>();
+            commit.path("history").path("nodes").forEach(node -> history.add(node.path("oid").asText()));
+            int at = history.indexOf(asked.get(n).before());
+            described.put(asked.get(n).head(), new PushInfo(
+                    commit.path("messageHeadline").asText(),
+                    at > 0 ? at : null,
+                    repo.path("defaultBranchRef").path("name").asText(null)));
+        }
+        return described;
+    }
+
+    /* Как graphQl, но частичный ответ не считается провалом: удалённый или
+       переименованный репозиторий даёт ошибку только своему псевдониму,
+       и терять из-за неё остальные пуши незачем. */
+    private JsonNode graphQlPartial(String query, Map<String, Object> variables) {
+        HttpEntity<Map<String, Object>> request =
+                new HttpEntity<>(Map.of("query", query, "variables", variables), headers());
+        JsonNode response;
+        try {
+            response = template.postForObject(GRAPHQL_URL, request, JsonNode.class);
+        } catch (RestClientException e) {
+            throw new GithubApiResponseException("GITHUB API ERROR: " + e.getMessage());
+        }
+        if (response == null || !response.path("data").isObject()) {
+            throw new GithubApiResponseException("GITHUB API ERROR: "
+                    + (response == null ? "empty response" : response.path("errors").toString()));
+        }
+        if (response.has("errors")) {
+            log.warn("GITHUB: часть пушей не описана: {}", response.path("errors"));
+        }
+        return response.path("data");
+    }
+
     /* Складываем только свои коммиты: в истории лежат и чужие, если в репозиторий
        кто-то присылал изменения. Возвращаем признак того, что страница не последняя. */
     private boolean sumHistory(JsonNode history, String me, long[] totals) {
@@ -200,7 +305,11 @@ public class GithubAPIClientImpl implements GithubAPIClient {
 
     private HttpHeaders headers() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(token);
+        /* Без токена публичные события GitHub всё равно отдаёт, только
+           с лимитом поменьше; пустой заголовок он же счёл бы ошибкой. */
+        if (token != null && !token.isBlank()) {
+            headers.setBearerAuth(token);
+        }
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         headers.set("X-GitHub-Api-Version", "2022-11-28");
         return headers;

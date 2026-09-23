@@ -86,18 +86,7 @@ public class GameServiceImpl implements GameService {
     @Override
     public List<GameDto> getRecentlyGames() {
         Library library = library();
-
-        List<Game> games = new ArrayList<>(library.steam().stream()
-                /* Ноль — это «не запускали ни разу». Такие игры в список
-                   последних не попадают: у них нет своего места на шкале. */
-                .filter(gog -> gog.getRtime_last_played() > 0)
-                .map(GameMapper::gogDtoToGame)
-                .toList());
-
-        library.fortnite().ifPresent(stats -> games.add(
-                GameMapper.fortniteToGame(stats, fortniteTitle, fortniteIcon, fortniteBanner)));
-
-        games.sort(Comparator.comparing(Game::getRtime_last_played).reversed());
+        List<Game> games = playedGames(library);
 
         /* Запущенную игру поднимаем наверх независимо от того, что записано
            в библиотеке: Steam обновляет время последнего запуска не сразу,
@@ -165,6 +154,26 @@ public class GameServiceImpl implements GameService {
         }
 
         return recent;
+    }
+
+    @Override
+    public List<Game> getPlayedGames() {
+        return playedGames(library());
+    }
+
+    private List<Game> playedGames(Library library) {
+        List<Game> games = new ArrayList<>(library.steam().stream()
+                /* Ноль — это «не запускали ни разу». Такие игры в список
+                   последних не попадают: у них нет своего места на шкале. */
+                .filter(gog -> gog.getRtime_last_played() > 0)
+                .map(GameMapper::gogDtoToGame)
+                .toList());
+
+        library.fortnite().ifPresent(stats -> games.add(
+                GameMapper.fortniteToGame(stats, fortniteTitle, fortniteIcon, fortniteBanner)));
+
+        games.sort(Comparator.comparing(Game::getRtime_last_played).reversed());
+        return games;
     }
 
     private static int indexOf(List<Game> games, int appid) {

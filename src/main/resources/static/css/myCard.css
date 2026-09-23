@@ -1426,6 +1426,179 @@ h2.playtime .num { color: var(--text); }
     color: var(--accent);
 }
 
+/* ----------------------------------------------------------------- log --
+   Лента всего, что я делаю в сети: коммиты, звёзды, лайки, игры.
+   Выглядит как журнал: время, источник, действие — моноширинная сетка,
+   где колонки держатся сами, без рамок и плиток. Цвет только у маркера
+   действия и у активного фильтра: сама лента серая, как весь текст. */
+
+.log-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.log-filter {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 3px 10px;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--panel-soft);
+    color: var(--dim);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.log-filter:hover { background: var(--panel-hover); color: var(--text); }
+.log-filter:focus-visible { outline: 1px solid var(--accent-line); outline-offset: 2px; }
+.log-filter[aria-pressed="true"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.log-filter .n {
+    color: var(--faint);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+.log-filter[aria-pressed="true"] .n { color: var(--accent-mark); }
+
+/* Свёрнутая лента показывает несколько последних строк и гаснет книзу —
+   видно, что дальше есть ещё. */
+.log-wrap {
+    position: relative;
+    margin-top: 14px;
+    max-height: 330px;
+    overflow: hidden;
+    transition: max-height .45s ease;
+}
+.log-wrap::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 70px;
+    background: linear-gradient(to bottom, transparent, var(--panel));
+    pointer-events: none;
+    transition: opacity .3s ease;
+}
+.log-wrap.expanded { max-height: 520px; overflow-y: auto; }
+.log-wrap.expanded::after { opacity: 0; }
+.log-wrap.short::after { display: none; }
+
+.log-day {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 4px;
+    font-size: 11.5px;
+    color: var(--dim);
+    letter-spacing: .04em;
+}
+.log-day:first-child { margin-top: 0; }
+.log-day::after {
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--line-soft);
+}
+
+/* Время | источник | что сделал. Колонки фиксированные, чтобы строки
+   разных источников вставали ровно друг под другом. */
+.log-row {
+    display: grid;
+    grid-template-columns: 42px 58px minmax(0, 1fr);
+    gap: 0 12px;
+    align-items: baseline;
+    padding: 4px 6px;
+    border-radius: 2px;
+    color: var(--muted);
+    font-size: 12.5px;
+    transition: background .15s ease;
+}
+a.log-row:hover { background: var(--panel-hover); color: var(--muted); }
+a.log-row:focus-visible { outline: 1px solid var(--accent-line); outline-offset: -1px; }
+
+.log-time {
+    color: var(--faint);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+}
+.log-src {
+    color: var(--dim);
+    font-size: 11.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.log-what { min-width: 0; overflow-wrap: anywhere; }
+
+/* Маркер действия — единственный цвет в строке: по нему глаз отличает
+   коммит от лайка, не читая подпись. */
+.log-mark {
+    display: inline-block;
+    width: 1.3em;
+    color: var(--accent-mark);
+}
+.log-row[data-kind="love"] .log-mark { color: #d0707a; }
+.log-row[data-kind="star"] .log-mark { color: #d6b25e; }
+
+.log-verb { color: var(--dim); }
+.log-subject { color: var(--text); }
+a.log-row:hover .log-subject { color: var(--accent); }
+
+/* Подробность — сообщение коммита, подпись видео — второй строкой, тише. */
+.log-detail {
+    display: block;
+    margin-top: 1px;
+    padding-left: 1.3em;
+    color: var(--dim);
+    font-size: 11.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.log-detail::before { content: "└ "; color: var(--faint); }
+
+.log-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 6px;
+    padding: 4px;
+    border: 0;
+    background: none;
+    color: var(--dim);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: color .15s ease;
+}
+.log-toggle:hover { color: var(--accent); }
+.log-toggle svg { width: 16px; height: 16px; transition: transform .35s ease; }
+.log-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+.log-empty {
+    padding: 18px 6px;
+    color: var(--dim);
+    font-size: 12.5px;
+}
+
+@media (max-width: 720px) {
+    /* на телефоне источник уходит под время: две узкие колонки съедали
+       половину строки */
+    .log-row {
+        grid-template-columns: 42px minmax(0, 1fr);
+        grid-template-areas: "time what" "src what";
+    }
+    .log-time { grid-area: time; }
+    .log-src  { grid-area: src; font-size: 10.5px; color: var(--faint); }
+    .log-what { grid-area: what; }
+}
+
 /* ----------------------------------------------------------- guestbook --
    Композер — единственная заливка в секции, поэтому глаз сразу идёт туда.
    Поля внутри него прозрачные: рамок на сайте нет, границу поля рисует сам
@@ -1655,6 +1828,7 @@ footer .quote {
     .about          { order: 2; }
     .contacts       { order: 3; }
     .github         { order: 4; }
+    .log-section    { order: 4; }
     .stack          { order: 5; }
     .music          { order: 6; }
     .game-section   { order: 7; }

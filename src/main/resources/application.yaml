@@ -21,6 +21,9 @@ server:
 
 last.fm:
   api-token: ${LASTFM_API_TOKEN:}
+  # Чьи лайки идут в ленту [ log ], через запятую. Два аккаунта, потому что
+  # слушаю теперь с Gna1zel, а все прежние лайки остались на Gnaizel.
+  loved-users: ${LASTFM_LOVED_USERS:Gna1zel,Gnaizel}
 
 steam:
   # Аккаунтов может быть сколько угодно, через запятую: ключ Steam выдаётся

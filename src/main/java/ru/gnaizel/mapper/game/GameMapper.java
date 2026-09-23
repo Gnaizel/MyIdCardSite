@@ -45,7 +45,7 @@ public class GameMapper {
                 .build();
     }
 
-    private static String formatPlaytime(Integer minutes) {
+    public static String formatPlaytime(Integer minutes) {
         if (minutes == null || minutes == 0) {
             return "0m";
         }
