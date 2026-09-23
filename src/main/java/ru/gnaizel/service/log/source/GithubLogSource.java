@@ -8,13 +8,16 @@ import ru.gnaizel.dto.log.LogEventDto;
 import ru.gnaizel.service.github.client.GithubAPIClient;
 import ru.gnaizel.service.github.client.GithubAPIClient.Push;
 import ru.gnaizel.service.github.client.GithubAPIClient.PushInfo;
+import ru.gnaizel.service.github.client.GithubAPIClient.RepoInfo;
 import ru.gnaizel.service.log.LogSource;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Пуши, звёзды, новые репозитории, пулл-реквесты — из публичной ленты
@@ -26,10 +29,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class GithubLogSource implements LogSource {
     private static final String GITHUB = "https://github.com/";
+    private static final String AVATAR = "https://avatars.githubusercontent.com/%s?s=64";
 
     /* Больше ста событий GitHub за раз не отдаёт, так что это «все пуши»:
        предел только страхует размер запроса, если он когда-нибудь это изменит. */
     private static final int DESCRIBED_PUSHES = 100;
+
+    /* У этих событий на странице карточка репозитория: описание, язык, звёзды. */
+    private static final Set<String> REPO_CARDS = Set.of("WatchEvent", "ForkEvent", "CreateEvent");
 
     private final GithubAPIClient client;
 
@@ -46,30 +53,19 @@ public class GithubLogSource implements LogSource {
         client.getPublicEvents().forEach(events::add);
         events.sort(Comparator.comparing((JsonNode e) -> e.path("created_at").asText()).reversed());
 
-        List<Push> pushes = events.stream()
-                .filter(e -> "PushEvent".equals(e.path("type").asText()))
-                .limit(DESCRIBED_PUSHES)
-                .map(e -> new Push(repo(e), e.path("payload").path("head").asText(),
-                        e.path("payload").path("before").asText()))
-                .toList();
-        Map<String, PushInfo> described;
-        try {
-            described = client.describePushes(pushes);
-        } catch (RuntimeException e) {
-            /* Без подробностей пуш всё равно пуш: строка останется,
-               только без сообщения коммита. */
-            log.warn("LOG: не описал пуши: {}", e.getMessage());
-            described = Map.of();
-        }
+        Map<String, PushInfo> pushes = describePushes(events);
+        Map<String, RepoInfo> repos = describeRepos(events);
 
         List<LogEventDto> rows = new ArrayList<>();
         for (JsonNode event : events) {
             LogEventDto row = switch (event.path("type").asText()) {
-                case "PushEvent" -> push(event, described);
-                case "WatchEvent" -> simple(event, "star", GITHUB + repo(event));
-                case "ForkEvent" -> simple(event, "fork",
-                        GITHUB + event.path("payload").path("forkee").path("full_name").asText(repo(event)));
-                case "CreateEvent" -> created(event);
+                case "PushEvent" -> push(event, pushes);
+                case "WatchEvent" -> repoCard(event, "star", repos);
+                case "ForkEvent" -> repoCard(event, "fork", repos);
+                case "CreateEvent" -> "repository".equals(event.path("payload").path("ref_type").asText())
+                        ? repoCard(event, "repo", repos)
+                        /* ветки и теги появляются по десятку в день и ленту бы засорили */
+                        : null;
                 case "PullRequestEvent" -> pullRequest(event);
                 case "IssuesEvent" -> issue(event);
                 case "ReleaseEvent" -> release(event);
@@ -82,6 +78,36 @@ public class GithubLogSource implements LogSource {
             }
         }
         return rows;
+    }
+
+    private Map<String, PushInfo> describePushes(List<JsonNode> events) {
+        List<Push> pushes = events.stream()
+                .filter(e -> "PushEvent".equals(e.path("type").asText()))
+                .limit(DESCRIBED_PUSHES)
+                .map(e -> new Push(repo(e), e.path("payload").path("head").asText(),
+                        e.path("payload").path("before").asText()))
+                .toList();
+        try {
+            return client.describePushes(pushes);
+        } catch (RuntimeException e) {
+            /* Без подробностей пуш всё равно пуш: строка останется,
+               только без коммитов. */
+            log.warn("LOG: не описал пуши: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private Map<String, RepoInfo> describeRepos(List<JsonNode> events) {
+        Set<String> names = new LinkedHashSet<>();
+        events.stream()
+                .filter(e -> REPO_CARDS.contains(e.path("type").asText()))
+                .forEach(e -> names.add(repo(e)));
+        try {
+            return client.describeRepos(names);
+        } catch (RuntimeException e) {
+            log.warn("LOG: не описал репозитории: {}", e.getMessage());
+            return Map.of();
+        }
     }
 
     private LogEventDto push(JsonNode event, Map<String, PushInfo> described) {
@@ -97,10 +123,13 @@ public class GithubLogSource implements LogSource {
         if (info != null && info.defaultBranch() != null && !branch.equals(info.defaultBranch())) {
             subject += " · " + branch;
         }
-        Integer count = info == null ? null : info.commits();
+        Integer count = info != null && info.complete() ? info.commits().size() : null;
         String url = count != null && count > 1
                 ? GITHUB + repo(event) + "/compare/" + shortSha(before) + "..." + shortSha(head)
                 : GITHUB + repo(event) + "/commit/" + head;
+        List<LogEventDto.Commit> commits = info == null ? null : info.commits().stream()
+                .map(c -> new LogEventDto.Commit(shortSha(c.sha()), c.message()))
+                .toList();
 
         return LogEventDto.builder()
                 .source("github")
@@ -108,19 +137,22 @@ public class GithubLogSource implements LogSource {
                 .at(at(event))
                 .subject(subject)
                 .count(count)
-                .detail(info == null ? null : info.headline())
+                .commits(commits)
+                .detail(commits == null ? null : commits.get(0).message())
+                .image(avatar(event))
                 .url(url)
                 .build();
     }
 
-    /* Только новый репозиторий: ветки и теги появляются по десятку в день
-       и ленту бы засорили. */
-    private LogEventDto created(JsonNode event) {
-        if (!"repository".equals(event.path("payload").path("ref_type").asText())) {
-            return null;
+    private LogEventDto repoCard(JsonNode event, String kind, Map<String, RepoInfo> repos) {
+        LogEventDto row = simple(event, kind, GITHUB + repo(event));
+        RepoInfo info = repos.get(repo(event));
+        if (info != null) {
+            row.setDetail(info.description());
+            row.setLanguage(info.language());
+            row.setLanguageColor(info.languageColor());
+            row.setStars(info.stars());
         }
-        LogEventDto row = simple(event, "repo", GITHUB + repo(event));
-        row.setDetail(text(event.path("payload").path("description")));
         return row;
     }
 
@@ -169,6 +201,7 @@ public class GithubLogSource implements LogSource {
                 .kind(kind)
                 .at(at(event))
                 .subject(repo(event))
+                .image(avatar(event))
                 .url(url)
                 .build();
     }
@@ -177,16 +210,21 @@ public class GithubLogSource implements LogSource {
         return event.path("repo").path("name").asText();
     }
 
+    /* Аватарка владельца репозитория: адрес собирается по имени, без запроса. */
+    private static String avatar(JsonNode event) {
+        return AVATAR.formatted(repo(event).split("/", 2)[0]);
+    }
+
     private static Instant at(JsonNode event) {
         return Instant.parse(event.path("created_at").asText());
     }
 
     private static String shortSha(String sha) {
-        return sha.length() > 12 ? sha.substring(0, 12) : sha;
+        return sha.length() > 7 ? sha.substring(0, 7) : sha;
     }
 
     private static String text(JsonNode node) {
         String value = node.asText(null);
-        return value == null || value.isBlank() || node.isNull() ? null : value;
+        return value == null || value.isBlank() ? null : value;
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import ru.gnaizel.dto.github.LineStatsDto;
 import ru.gnaizel.model.github.ContributionsCollection;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -25,16 +26,30 @@ public interface GithubAPIClient {
      */
     Map<String, PushInfo> describePushes(List<Push> pushes);
 
+    /**
+     * Описание, язык и звёзды репозиториев — для карточек звёзд, форков
+     * и новых репозиториев: сами события GitHub их не несут. Ключ — «владелец/имя».
+     */
+    Map<String, RepoInfo> describeRepos(Collection<String> repos);
+
     /** Пуш из ленты событий: куда, какой коммит стал головой, какой был до него. */
     record Push(String repo, String head, String before) {
     }
 
+    record Commit(String sha, String message) {
+    }
+
     /**
-     * @param commits       сколько коммитов принёс пуш; null — начала пуша
-     *                      в истории не нашлось (force push, огромный пуш)
+     * @param commits       коммиты пуша, от свежего к старому
+     * @param complete      нашлось ли в истории начало пуша. Нет (force push,
+     *                      огромный пуш) — в commits только голова, а сколько
+     *                      коммитов было на самом деле, неизвестно
      * @param defaultBranch главная ветка репозитория — чтобы подписывать
      *                      ветку только у пушей мимо неё
      */
-    record PushInfo(String headline, Integer commits, String defaultBranch) {
+    record PushInfo(List<Commit> commits, boolean complete, String defaultBranch) {
+    }
+
+    record RepoInfo(String description, String language, String languageColor, int stars) {
     }
 }

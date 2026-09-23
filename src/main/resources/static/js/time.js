@@ -1200,33 +1200,34 @@ fetch('/tiktok')
     .catch(err => console.error('Ошибка при получении репостов TikTok:', err));
 
 /* ------------------------------------------------------------------ log --
-   Лента всего, что я делаю в сети. Сервер отдаёт готовые события из API
-   (GitHub, Last.fm, Steam, Fortnite), страница только раскладывает их по
-   дням и фильтрует по источнику — сама ничего не считает. */
+   Лента всего, что я делаю в сети. Сервер отдаёт события из API (GitHub,
+   YouTube, Last.fm, Steam, Fortnite) вместе с картинками, страница собирает
+   из них карточки на таймлайне — у каждого вида события своя: видео с кадром,
+   игра с баннером, трек с обложкой, коммиты пачкой за день. Сама страница
+   ничего не считает, только раскладывает. */
 
 /* Порядок здесь — порядок фильтров над лентой. */
 const LOG_SOURCES = {
-    github: 'github',
-    lastfm: 'last.fm',
-    steam:  'steam',
-    epic:   'epic',
+    github:  'github',
+    youtube: 'youtube',
+    lastfm:  'last.fm',
+    steam:   'steam',
+    epic:    'epic',
 };
 
-/* Что сделал: маркер и глагол. Глагол стоит перед предметом, поэтому
-   строка читается как запись в журнале: «★ starred owner/repo».
-   Число коммитов бывает неизвестно (force push) — тогда просто «pushed to». */
+/* Значок на оси и глагол в шапке события. */
 const LOG_KINDS = {
-    push:    { mark: '↑', verb: e => e.count
-                   ? `pushed ${e.count} commit${e.count === 1 ? '' : 's'} to` : 'pushed to' },
-    repo:    { mark: '+', verb: () => 'created' },
-    star:    { mark: '★', verb: () => 'starred' },
-    fork:    { mark: '⑂', verb: () => 'forked' },
-    pr:      { mark: '⇄', verb: () => 'opened pr in' },
-    merge:   { mark: '✓', verb: () => 'merged pr in' },
-    issue:   { mark: '!', verb: () => 'opened issue in' },
-    release: { mark: '◆', verb: () => 'released' },
-    love:    { mark: '♥', verb: () => 'loved' },
-    play:    { mark: '▶', verb: () => 'played' },
+    push:    { mark: '↑', verb: 'pushed' },
+    repo:    { mark: '+', verb: 'created' },
+    star:    { mark: '★', verb: 'starred' },
+    fork:    { mark: '⑂', verb: 'forked' },
+    pr:      { mark: '⇄', verb: 'opened pr' },
+    merge:   { mark: '✓', verb: 'merged pr' },
+    issue:   { mark: '!', verb: 'opened issue' },
+    release: { mark: '◆', verb: 'released' },
+    like:    { mark: '♥', verb: 'liked' },
+    love:    { mark: '♥', verb: 'loved' },
+    play:    { mark: '▶', verb: 'played' },
 };
 
 const LOG_ZONE = 'Etc/GMT-4'; // это UTC+4: у Etc-зон знак наоборот
@@ -1253,19 +1254,102 @@ function logTime(date) {
         .format(date);
 }
 
-function logRow(event) {
-    const kind = LOG_KINDS[event.kind] || { mark: '·', verb: () => event.kind };
-    const date = new Date(event.at);
-    const tag = event.url ? 'a' : 'div';
-    const link = event.url ? ` href="${esc(event.url)}" target="_blank" rel="noopener"` : '';
-    const detail = event.detail ? `<span class="log-detail">${esc(event.detail)}</span>` : '';
-    return `<${tag} class="log-row" data-kind="${esc(event.kind)}"${link}>` +
-        `<span class="log-time">${logTime(date)}</span>` +
-        `<span class="log-src">${esc(LOG_SOURCES[event.source] || event.source)}</span>` +
-        `<span class="log-what"><span class="log-mark" aria-hidden="true">${kind.mark}</span>` +
-        `<span class="log-verb">${esc(kind.verb(event))}</span> ` +
-        `<span class="log-subject">${esc(event.subject)}</span>${detail}</span>` +
-        `</${tag}>`;
+/* Ссылки и картинки приходят из чужих API: пускаем только http(s) и свои пути. */
+function logUrl(value) {
+    return typeof value === 'string' && /^(https?:\/\/|\/(?!\/))/i.test(value) ? value : null;
+}
+
+function logImg(src, cls) {
+    const url = logUrl(src);
+    return url ? `<img class="${cls}" src="${esc(url)}" alt="" loading="lazy" decoding="async">` : '';
+}
+
+/* Пуши в один репозиторий за день складываются в одну карточку: иначе день
+   работы над сайтом — это двадцать одинаковых карточек подряд. Карточка
+   встаёт на место самого свежего пуша. */
+function logGroupPushes(items) {
+    const out = [];
+    const groups = new Map();
+    for (const event of items) {
+        if (event.kind !== 'push') {
+            out.push(event);
+            continue;
+        }
+        const key = logDayKey(new Date(event.at)) + '\u0000' + event.subject;
+        let group = groups.get(key);
+        if (!group) {
+            group = { ...event, commits: [], pushes: 0 };
+            groups.set(key, group);
+            out.push(group);
+        }
+        group.pushes += 1;
+        if (event.commits && event.commits.length) {
+            group.commits.push(...event.commits);
+        } else {
+            /* GitHub не описал пуш — остаётся то, что есть в самом событии */
+            const sha = /\/commit\/([0-9a-f]{7})/.exec(event.url || '');
+            group.commits.push({ sha: sha ? sha[1] : '', message: event.detail || 'push' });
+        }
+    }
+    /* у одного пуша своя ссылка на коммит, у пачки — история репозитория */
+    for (const group of groups.values()) {
+        const repo = /^https:\/\/github\.com\/[^/]+\/[^/]+/.exec(group.url || '');
+        if (group.pushes > 1 && repo) group.url = repo[0] + '/commits';
+    }
+    return out;
+}
+
+function logRepoCard(event) {
+    const meta = [];
+    if (event.language) {
+        const color = /^#[0-9a-f]{3,8}$/i.test(event.languageColor || '') ? event.languageColor : 'var(--dim)';
+        meta.push(`<span><i class="log-lang" style="background:${color}"></i>${esc(event.language)}</span>`);
+    }
+    if (event.stars != null) meta.push(`<span>★ ${ghCompact(event.stars)}</span>`);
+    return `<p class="log-r-name">${logImg(event.image, 'log-avatar')}<span class="log-name">${esc(event.subject)}</span></p>` +
+        (event.detail ? `<p class="log-r-desc">${esc(event.detail)}</p>` : '') +
+        (meta.length ? `<p class="log-r-meta">${meta.join('')}</p>` : '');
+}
+
+/* Карточка по виду события. Чего нет в этом списке — звёзды, форки,
+   пулл-реквесты, релизы — рисуется карточкой репозитория. */
+const LOG_CARDS = {
+    like: e => `<div class="log-frame">${logImg(e.image, 'log-frame-img')}` +
+        (e.duration ? `<span class="log-dur">${esc(e.duration)}</span>` : '') + '</div>' +
+        `<p class="log-title">${esc(e.subject)}</p>` +
+        (e.author ? `<p class="log-sub">${esc(e.author)}</p>` : ''),
+    play: e => (logUrl(e.image) ? `<div class="log-banner">${logImg(e.image, 'log-banner-img')}</div>` : '') +
+        `<p class="log-title">${esc(e.subject)}</p>` +
+        (e.detail ? `<p class="log-sub">${esc(e.detail)}</p>` : ''),
+    love: e => `<div class="log-track"><div class="log-cover">${logImg(e.image, 'log-cover-img')}</div>` +
+        `<div class="log-track-text"><p class="log-track-name">${esc(e.subject)}</p>` +
+        `<p class="log-track-artist">${esc(e.author)}</p></div>` +
+        `<span class="log-heart" aria-hidden="true">♥</span></div>`,
+    push: e => {
+        const n = e.commits.length;
+        return `<p class="log-c-repo">${logImg(e.image, 'log-avatar')}<span class="log-name">${esc(e.subject)}</span>` +
+            `<span class="log-c-count">${n} commit${n === 1 ? '' : 's'}</span></p>` +
+            `<ol class="log-c-list">${e.commits.slice(0, 3).map(c =>
+                `<li><span class="log-c-sha">${esc(c.sha)}</span><span class="log-c-msg">${esc(c.message)}</span></li>`)
+                .join('')}</ol>` +
+            (n > 3 ? `<p class="log-c-more">+${n - 3} more</p>` : '');
+    },
+};
+
+function logEvent(event) {
+    const kind = LOG_KINDS[event.kind] || { mark: '·', verb: event.kind };
+    /* видео и игра — картинка во всю ширину, остальное — карточка с подложкой */
+    const cls = event.kind === 'like' || event.kind === 'play' ? 'log-media' : 'log-box';
+    const body = (LOG_CARDS[event.kind] || logRepoCard)(event);
+    const url = logUrl(event.url);
+    const card = url
+        ? `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener">${body}</a>`
+        : `<div class="${cls}">${body}</div>`;
+    return `<article class="log-ev" data-kind="${esc(event.kind)}">` +
+        `<span class="log-node" aria-hidden="true">${kind.mark}</span>` +
+        `<div class="log-ev-body"><p class="log-head"><span class="log-verb">${esc(kind.verb)}</span>` +
+        `<span>· ${esc(LOG_SOURCES[event.source] || event.source)}</span>` +
+        `<time datetime="${esc(event.at)}">${logTime(new Date(event.at))}</time></p>${card}</div></article>`;
 }
 
 function renderLogFilters() {
@@ -1279,8 +1363,8 @@ function renderLogFilters() {
     box.innerHTML = [['all', 'all', logState.items.length]]
         .concat(sources.map(s => [s, LOG_SOURCES[s], counts[s]]))
         .map(([key, label, n]) =>
-            `<button class="log-filter" type="button" data-source="${key}" ` +
-            `aria-pressed="${key === logState.filter}">${esc(label)}<span class="n">${n}</span></button>`)
+            `<button class="log-filter" type="button" data-source="${key}" title="${n} events" ` +
+            `aria-pressed="${key === logState.filter}">${esc(label)}</button>`)
         .join('');
 }
 
@@ -1288,7 +1372,8 @@ function renderLogList() {
     const list = document.getElementById('log-list');
     const wrap = document.getElementById('log-wrap');
     const toggle = document.getElementById('log-toggle');
-    const shown = logState.items.filter(e => logState.filter === 'all' || e.source === logState.filter);
+    const shown = logGroupPushes(logState.items
+        .filter(e => logState.filter === 'all' || e.source === logState.filter));
 
     let html = '';
     let day = '';
@@ -1298,9 +1383,16 @@ function renderLogList() {
             html += `<div class="log-day">${esc(label)}</div>`;
             day = label;
         }
-        html += logRow(event);
+        html += logEvent(event);
     });
     list.innerHTML = html || '<p class="log-empty">nothing here yet</p>';
+
+    /* Картинка не загрузилась — убираем её, карточка остаётся с текстом.
+       У баннера игры пустая рамка ни к чему, её убираем целиком. */
+    list.querySelectorAll('img').forEach(img => img.addEventListener('error', () => {
+        const banner = img.closest('.log-banner');
+        (banner || img).remove();
+    }, { once: true }));
 
     /* Кнопка «ещё» нужна, только если лента правда не влезла. */
     const short = list.scrollHeight <= wrap.clientHeight + 4 && !wrap.classList.contains('expanded');

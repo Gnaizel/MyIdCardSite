@@ -132,6 +132,15 @@ github:
   # Наружу по /github уходят только числа: ни имён репозиториев, ни коммитов.
   api-token: ${GITHUB_TOKEN:}
 
+youtube:
+  # Лайкнутые видео для ленты [ log ]. Историю просмотров YouTube API не отдаёт
+  # вовсе, лайки — только с разрешения владельца аккаунта, поэтому здесь OAuth,
+  # а не ключ. Как получить все три значения — в README-LOCAL.md.
+  # Пусто — YouTube в ленте просто нет.
+  client-id: ${YOUTUBE_CLIENT_ID:}
+  client-secret: ${YOUTUBE_CLIENT_SECRET:}
+  refresh-token: ${YOUTUBE_REFRESH_TOKEN:}
+
 logging:
   level:
     root: info

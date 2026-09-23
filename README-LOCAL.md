@@ -25,6 +25,7 @@ copy .env.example .env    # один раз, потом впиши ключи
 | `STEAM_API_TOKEN` | игры: `/games`, `/games-total-hours` | [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey) |
 | `STEAM_IDS` | тот же блок игр, можно несколько аккаунтов | [steamid.io](https://steamid.io) — нужен SteamID64 |
 | `GITHUB_TOKEN` | календарь коммитов: `/github` | [github.com/settings/tokens](https://github.com/settings/tokens) |
+| `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN` | лайки YouTube в ленте `[ log ]` | см. ниже |
 | `FORTNITE_API_KEY` | часы и статистика Fortnite в блоке игр | [dash.fortnite-api.com](https://dash.fortnite-api.com/) |
 | `FORTNITE_NAME` | тот же блок: ник в Epic | свой ник |
 | `GUESTBOOK_ADMIN_KEY` | модерация гостевой книги | придумай сам |
@@ -85,6 +86,34 @@ Generate new token (classic)**. Из галочек нужна только **`r
 Наружу по `/github` уходят только числа: ни названий репозиториев, ни коммитов.
 
 Токен показывается один раз — скопируй сразу.
+
+### YouTube
+
+Лента `[ log ]` показывает лайкнутые видео. Историю просмотров YouTube API
+не отдаёт никому, а лайки — только с разрешения владельца аккаунта, поэтому
+здесь не ключ, а OAuth. Делается один раз:
+
+1. [console.cloud.google.com](https://console.cloud.google.com/) → создай проект →
+   **APIs & Services → Library** → включи **YouTube Data API v3**.
+2. **OAuth consent screen**: тип **External**, название любое, почта своя.
+   В **Test users** добавь свой Google-аккаунт. В конце нажми **Publish app**,
+   чтобы статус стал **In production**: в режиме Testing разрешение умирает
+   через 7 дней. Проверку Google проходить не нужно — при входе он покажет
+   «приложение не проверено», жми «Дополнительно → перейти».
+3. **Credentials → Create credentials → OAuth client ID**, тип **Web application**.
+   В **Authorized redirect URIs** впиши `https://developers.google.com/oauthplayground`.
+   Получишь **Client ID** и **Client secret**.
+4. Открой [OAuth 2.0 Playground](https://developers.google.com/oauthplayground):
+   шестерёнка справа сверху → **Use your own OAuth credentials** → вставь
+   Client ID и secret. Слева в поле под списком впиши scope
+   `https://www.googleapis.com/auth/youtube.readonly` → **Authorize APIs** →
+   войди аккаунтом, на котором ставишь лайки → **Exchange authorization code
+   for tokens**. Скопируй **Refresh token**.
+5. Впиши в `.env` `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` и `YOUTUBE_REFRESH_TOKEN`.
+
+Пока хоть одно из трёх пустое, YouTube в ленте просто нет. Если разрешение
+отзовут (сменил пароль, убрал доступ в настройках аккаунта Google), в логе
+появится `LOG: youtube не ответил: 400 ... invalid_grant` — повтори шаг 4.
 
 ### Телеграм-бот
 

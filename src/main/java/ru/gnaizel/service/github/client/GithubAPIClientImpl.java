@@ -18,6 +18,7 @@ import ru.gnaizel.model.github.GithubGraphQlResponse;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,8 +116,8 @@ public class GithubAPIClientImpl implements GithubAPIClient {
     private static final String EVENTS_URL = REST_URL + "/users/%s/events/public?per_page=100";
 
     /* Как глубоко от головы пуша искать его начало. Пуш длиннее — редкость,
-       и тогда число коммитов просто не пишем. */
-    private static final int PUSH_DEPTH = 50;
+       и тогда от него показываем только головной коммит. */
+    private static final int PUSH_DEPTH = 30;
 
     private final RestTemplate template = new RestTemplate();
 
@@ -192,10 +193,9 @@ public class GithubAPIClientImpl implements GithubAPIClient {
         return events;
     }
 
-    /* Все пуши — одним запросом: на каждый свой псевдоним p0, p1… с головой
-       пуша и полусотней коммитов под ней. Позиция прежней головы в этом
-       списке и есть число коммитов в пуше. Значения идут переменными, а не
-       вклеиваются в текст запроса. */
+    /* Все пуши — одним запросом: на каждый свой псевдоним p0, p1… с историей
+       от головы пуша вниз. Всё, что в ней стоит до прежней головы, и есть
+       коммиты пуша. Значения идут переменными, а не вклеиваются в текст запроса. */
     @Override
     public Map<String, PushInfo> describePushes(List<Push> pushes) {
         if (pushes.isEmpty() || token == null || token.isBlank()) {
@@ -218,7 +218,7 @@ public class GithubAPIClientImpl implements GithubAPIClient {
                       p%1$d: repository(owner: $o%1$d, name: $n%1$d) {
                         defaultBranchRef { name }
                         object(oid: $h%1$d) {
-                          ... on Commit { messageHeadline history(first: %2$d) { nodes { oid } } }
+                          ... on Commit { history(first: %2$d) { nodes { oid messageHeadline } } }
                         }
                       }
                     """.formatted(n, PUSH_DEPTH));
@@ -234,24 +234,79 @@ public class GithubAPIClientImpl implements GithubAPIClient {
         Map<String, PushInfo> described = new HashMap<>();
         for (int n = 0; n < asked.size(); n++) {
             JsonNode repo = data.path("p" + n);
-            JsonNode commit = repo.path("object");
-            if (!commit.hasNonNull("messageHeadline")) {
+            List<Commit> commits = new ArrayList<>();
+            boolean complete = false;
+            for (JsonNode node : repo.path("object").path("history").path("nodes")) {
+                String oid = node.path("oid").asText();
+                if (oid.equals(asked.get(n).before())) {
+                    complete = true;
+                    break;
+                }
+                commits.add(new Commit(oid, node.path("messageHeadline").asText()));
+            }
+            if (commits.isEmpty()) {
                 continue;
             }
-            List<String> history = new ArrayList<>();
-            commit.path("history").path("nodes").forEach(node -> history.add(node.path("oid").asText()));
-            int at = history.indexOf(asked.get(n).before());
+            /* Начала не нашли — наверняка известна только голова: остальное
+               могло прийти раньше, другим пушем. */
             described.put(asked.get(n).head(), new PushInfo(
-                    commit.path("messageHeadline").asText(),
-                    at > 0 ? at : null,
+                    List.copyOf(complete ? commits : commits.subList(0, 1)),
+                    complete,
                     repo.path("defaultBranchRef").path("name").asText(null)));
+        }
+        return described;
+    }
+
+    @Override
+    public Map<String, RepoInfo> describeRepos(Collection<String> repos) {
+        if (repos.isEmpty() || token == null || token.isBlank()) {
+            return Map.of();
+        }
+
+        StringBuilder params = new StringBuilder();
+        StringBuilder fields = new StringBuilder();
+        Map<String, Object> variables = new HashMap<>();
+        List<String> asked = new ArrayList<>();
+        for (String name : repos) {
+            String[] parts = name.split("/", 2);
+            if (parts.length != 2) {
+                continue;
+            }
+            int n = asked.size();
+            asked.add(name);
+            params.append("$o%1$d: String!, $n%1$d: String!, ".formatted(n));
+            fields.append("""
+                      r%1$d: repository(owner: $o%1$d, name: $n%1$d) {
+                        description stargazerCount primaryLanguage { name color }
+                      }
+                    """.formatted(n));
+            variables.put("o" + n, parts[0]);
+            variables.put("n" + n, parts[1]);
+        }
+        if (asked.isEmpty()) {
+            return Map.of();
+        }
+
+        JsonNode data = graphQlPartial("query(" + params + ") {\n" + fields + "}", variables);
+        Map<String, RepoInfo> described = new HashMap<>();
+        for (int n = 0; n < asked.size(); n++) {
+            JsonNode repo = data.path("r" + n);
+            if (!repo.isObject()) {
+                continue;
+            }
+            String description = repo.path("description").asText(null);
+            described.put(asked.get(n), new RepoInfo(
+                    description == null || description.isBlank() ? null : description.strip(),
+                    repo.path("primaryLanguage").path("name").asText(null),
+                    repo.path("primaryLanguage").path("color").asText(null),
+                    repo.path("stargazerCount").asInt()));
         }
         return described;
     }
 
     /* Как graphQl, но частичный ответ не считается провалом: удалённый или
        переименованный репозиторий даёт ошибку только своему псевдониму,
-       и терять из-за неё остальные пуши незачем. */
+       и терять из-за неё остальные незачем. */
     private JsonNode graphQlPartial(String query, Map<String, Object> variables) {
         HttpEntity<Map<String, Object>> request =
                 new HttpEntity<>(Map.of("query", query, "variables", variables), headers());
@@ -266,7 +321,7 @@ public class GithubAPIClientImpl implements GithubAPIClient {
                     + (response == null ? "empty response" : response.path("errors").toString()));
         }
         if (response.has("errors")) {
-            log.warn("GITHUB: часть пушей не описана: {}", response.path("errors"));
+            log.warn("GITHUB: часть ответа пришла с ошибками: {}", response.path("errors"));
         }
         return response.path("data");
     }

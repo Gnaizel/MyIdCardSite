@@ -42,6 +42,8 @@ public class GamesLogSource implements LogSource {
                         .kind("play")
                         .at(game.getRtime_last_played().atZone(ZONE).toInstant())
                         .subject(game.getName())
+                        /* баннер тот же, что в блоке игр: у Steam по appid, у Fortnite из настроек */
+                        .image(game.getBanner_url())
                         .detail(game.getPlaytime_2weeks() > 0
                                 ? GameMapper.formatPlaytime(game.getPlaytime_2weeks()) + " in the last 2 weeks"
                                 : null)
