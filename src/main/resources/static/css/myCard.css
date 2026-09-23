@@ -1427,12 +1427,14 @@ h2.playtime .num { color: var(--text); }
 }
 
 /* ----------------------------------------------------------------- log --
-   Лента всего, что я делаю в сети — таймлайном. Слева тонкая ось с узлами,
-   в узле значок действия. Справа карточка, форма которой зависит от события:
-   у видео кадр 16:9, у игры баннер Steam, у трека квадрат обложки, у коммитов
-   сообщения за день, у репозитория описание и язык.
-   Цвет — только у значков на оси и у выбранного фильтра: сами карточки
-   серые, как всё на странице, цветными их делают картинки. */
+   Лента всего, что я делаю в сети — таймлайном, последним блоком справа.
+   Слева тонкая ось с узлами, в узле значок действия. Справа карточка,
+   форма которой зависит от события: у видео небольшой кадр, у игры баннер
+   Steam, у трека обложка, у коммитов сообщения за день, у репозитория
+   описание и язык.
+   Цвет — только у значков на оси и у выбранного фильтра. Картинки
+   приглушены, как аватарка, и оживают по наведению: яркие баннеры
+   и кадры иначе перетягивали бы на себя всю страницу. */
 
 .log-section {
     --log-love: #d0707a;
@@ -1469,7 +1471,7 @@ h2.playtime .num { color: var(--text); }
     --log-ground: var(--bg);
     position: relative;
     margin-top: 12px;
-    max-height: 620px;
+    max-height: 540px;
     overflow: hidden;
     transition: max-height .45s ease;
 }
@@ -1562,7 +1564,7 @@ h2.playtime .num { color: var(--text); }
     font-variant-numeric: tabular-nums;
 }
 
-/* Карточки с подложкой: трек, коммиты, репозиторий. */
+/* Карточка события — подложка, как у ссылок и треков на странице. */
 .log-box {
     display: block;
     padding: 10px 12px;
@@ -1573,16 +1575,22 @@ h2.playtime .num { color: var(--text); }
 }
 a.log-box:hover { background: var(--panel-hover); color: var(--text); }
 
-/* Карточки-картинки: видео и игра — кадр во всю ширину, подпись под ним. */
-.log-media { display: block; color: var(--text); }
-a.log-media:hover { color: var(--text); }
+/* Видео и игра: картинка слева небольшим кадром, подпись справа.
+   Во всю ширину колонки баннер вышел бы больше любого блока на странице. */
+.log-media {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    padding: 8px 12px 8px 8px;
+}
 .log-frame,
 .log-banner {
     position: relative;
-    max-width: 100%;
-    border-radius: var(--radius-tile);
+    width: 120px;
+    border-radius: 6px;
     overflow: hidden;
-    background: var(--panel-soft);
+    background: var(--panel-hover);
 }
 .log-frame  { aspect-ratio: 16 / 9; }
 .log-banner { aspect-ratio: 460 / 215; }
@@ -1591,24 +1599,30 @@ a.log-media:hover { color: var(--text); }
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform .4s ease;
 }
-a.log-media:hover .log-frame-img,
-a.log-media:hover .log-banner-img { transform: scale(1.04); }
+.log-frame-img,
+.log-banner-img,
+.log-cover-img {
+    filter: saturate(.5) brightness(.82) contrast(1.06);
+    transition: filter .2s ease;
+}
+a.log-box:hover .log-frame-img,
+a.log-box:hover .log-banner-img,
+a.log-box:hover .log-cover-img { filter: none; }
 .log-dur {
     position: absolute;
-    right: 6px;
-    bottom: 6px;
-    padding: 0 5px;
-    border-radius: 4px;
+    right: 4px;
+    bottom: 4px;
+    padding: 0 4px;
+    border-radius: 3px;
     background: rgba(0, 0, 0, .78);
     color: #fff;
-    font-size: 10.5px;
+    font-size: 10px;
     line-height: 1.6;
     font-variant-numeric: tabular-nums;
 }
+.log-text { min-width: 0; }
 .log-title {
-    margin-top: 8px;
     font-size: 12.5px;
     line-height: 1.45;
     color: var(--text);
@@ -1619,7 +1633,7 @@ a.log-media:hover .log-banner-img { transform: scale(1.04); }
     overflow-wrap: anywhere;
     transition: color .15s ease;
 }
-a.log-media:hover .log-title { color: var(--accent); }
+a.log-box:hover .log-title { color: var(--accent); }
 .log-sub {
     margin-top: 2px;
     font-size: 11px;
@@ -2005,7 +2019,7 @@ footer .quote {
     .about          { order: 2; }
     .contacts       { order: 3; }
     .github         { order: 4; }
-    .log-section    { order: 5; }
+    .log-section    { order: 10; }
     .stack          { order: 5; }
     .music          { order: 6; }
     .game-section   { order: 7; }

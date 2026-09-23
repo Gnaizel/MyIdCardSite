@@ -1314,13 +1314,13 @@ function logRepoCard(event) {
 /* Карточка по виду события. Чего нет в этом списке — звёзды, форки,
    пулл-реквесты, релизы — рисуется карточкой репозитория. */
 const LOG_CARDS = {
-    like: e => `<div class="log-frame">${logImg(e.image, 'log-frame-img')}` +
-        (e.duration ? `<span class="log-dur">${esc(e.duration)}</span>` : '') + '</div>' +
-        `<p class="log-title">${esc(e.subject)}</p>` +
-        (e.author ? `<p class="log-sub">${esc(e.author)}</p>` : ''),
+    like: e => (logUrl(e.image) ? `<div class="log-frame">${logImg(e.image, 'log-frame-img')}` +
+            (e.duration ? `<span class="log-dur">${esc(e.duration)}</span>` : '') + '</div>' : '') +
+        `<div class="log-text"><p class="log-title">${esc(e.subject)}</p>` +
+        (e.author ? `<p class="log-sub">${esc(e.author)}</p>` : '') + '</div>',
     play: e => (logUrl(e.image) ? `<div class="log-banner">${logImg(e.image, 'log-banner-img')}</div>` : '') +
-        `<p class="log-title">${esc(e.subject)}</p>` +
-        (e.detail ? `<p class="log-sub">${esc(e.detail)}</p>` : ''),
+        `<div class="log-text"><p class="log-title">${esc(e.subject)}</p>` +
+        (e.detail ? `<p class="log-sub">${esc(e.detail)}</p>` : '') + '</div>',
     love: e => `<div class="log-track"><div class="log-cover">${logImg(e.image, 'log-cover-img')}</div>` +
         `<div class="log-track-text"><p class="log-track-name">${esc(e.subject)}</p>` +
         `<p class="log-track-artist">${esc(e.author)}</p></div>` +
@@ -1338,8 +1338,9 @@ const LOG_CARDS = {
 
 function logEvent(event) {
     const kind = LOG_KINDS[event.kind] || { mark: '·', verb: event.kind };
-    /* видео и игра — картинка во всю ширину, остальное — карточка с подложкой */
-    const cls = event.kind === 'like' || event.kind === 'play' ? 'log-media' : 'log-box';
+    /* у видео и игры картинка слева, подпись справа — если картинка есть */
+    const media = (event.kind === 'like' || event.kind === 'play') && logUrl(event.image);
+    const cls = media ? 'log-box log-media' : 'log-box';
     const body = (LOG_CARDS[event.kind] || logRepoCard)(event);
     const url = logUrl(event.url);
     const card = url
@@ -1388,10 +1389,15 @@ function renderLogList() {
     list.innerHTML = html || '<p class="log-empty">nothing here yet</p>';
 
     /* Картинка не загрузилась — убираем её, карточка остаётся с текстом.
-       У баннера игры пустая рамка ни к чему, её убираем целиком. */
+       Пустая рамка кадра ни к чему: её убираем вместе с колонкой под неё. */
     list.querySelectorAll('img').forEach(img => img.addEventListener('error', () => {
-        const banner = img.closest('.log-banner');
-        (banner || img).remove();
+        const holder = img.closest('.log-frame, .log-banner');
+        if (holder) {
+            holder.closest('.log-media')?.classList.remove('log-media');
+            holder.remove();
+        } else {
+            img.remove();
+        }
     }, { once: true }));
 
     /* Кнопка «ещё» нужна, только если лента правда не влезла. */
