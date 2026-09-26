@@ -11,12 +11,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import ru.gnaizel.dto.games.GOGSteamResponseDto;
 import ru.gnaizel.dto.games.NowPlayingDto;
+import ru.gnaizel.dto.games.SteamAccountDto;
 import ru.gnaizel.dto.games.SteamOwnedGamesResponse;
 import ru.gnaizel.exception.SteamApiResponseException;
 
@@ -34,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Аккаунтов может быть несколько: ключ Steam выдаётся разработчику, а не
@@ -79,7 +82,12 @@ public class SteamAPIClientImpl implements SteamAPIClient {
        не длится, а запросы копятся. */
     private static final Duration NOW_TTL = Duration.ofMinutes(1);
 
-    private final RestTemplate template = new RestTemplate();
+    /* Сколько ждать, пока профили обновляет другой запрос, прежде чем
+       отдать то, что уже есть. */
+    private static final long SUMMARIES_WAIT_MS = 2000;
+
+    private final RestTemplate template = timeoutedTemplate();
+    private final ReentrantLock summariesLock = new ReentrantLock();
     private final ObjectMapper json = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             /* Иначе время пишется числом секунд и файл нельзя прочитать глазами. */
@@ -92,6 +100,11 @@ public class SteamAPIClientImpl implements SteamAPIClient {
 
     private volatile Optional<NowPlayingDto> nowPlaying = Optional.empty();
     private volatile Instant nowPlayingAt;
+
+    /* Последние удачно полученные профили. В отличие от «играет сейчас»,
+       при сбое их не обнуляем: аватарка за минуту не устаревает, а пустой
+       блок ссылок выглядел бы поломкой. */
+    private volatile List<SteamAccountDto> accounts = List.of();
 
     @Value("${steam.api-token}")
     private String token;
@@ -154,20 +167,64 @@ public class SteamAPIClientImpl implements SteamAPIClient {
 
     @Override
     public Optional<NowPlayingDto> getNowPlaying() {
-        if (nowPlayingAt != null
-                && Duration.between(nowPlayingAt, Instant.now()).compareTo(NOW_TTL) < 0) {
-            return nowPlaying;
-        }
+        refreshSummaries();
+        return nowPlaying;
+    }
 
-        List<String> accounts = steamIds();
-        if (accounts.isEmpty()) {
-            return Optional.empty();
+    @Override
+    public List<SteamAccountDto> getAccounts() {
+        refreshSummaries();
+        return accounts;
+    }
+
+    /* Один запрос на все аккаунты, не чаще раза в минуту, кто бы
+       ни спрашивал: и «играет сейчас», и аватарки берутся из него.
+       Пока он идёт, остальные ждут его недолго и отдают то, что уже есть.
+       synchronized здесь не годится: один повисший ответ Steam держал бы
+       замок, и за ним вставал бы весь блок игр у всех посетителей. */
+    private void refreshSummaries() {
+        if (summariesFresh()) {
+            return;
+        }
+        try {
+            if (!summariesLock.tryLock(SUMMARIES_WAIT_MS, TimeUnit.MILLISECONDS)) {
+                return;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        try {
+            // пока ждали замок, профили мог обновить тот, кто его держал
+            if (!summariesFresh()) {
+                fetchSummaries();
+            }
+        } finally {
+            summariesLock.unlock();
+        }
+    }
+
+    private boolean summariesFresh() {
+        return nowPlayingAt != null
+                && Duration.between(nowPlayingAt, Instant.now()).compareTo(NOW_TTL) < 0;
+    }
+
+    private void fetchSummaries() {
+        List<String> accountIds = steamIds();
+        if (accountIds.isEmpty()) {
+            nowPlaying = Optional.empty();
+            nowPlayingAt = Instant.now();
+            return;
         }
 
         try {
             JsonNode response = template.getForObject(
-                    SUMMARIES_URL.formatted(token, String.join(",", accounts)), JsonNode.class);
+                    SUMMARIES_URL.formatted(token, String.join(",", accountIds)), JsonNode.class);
             nowPlaying = firstInGame(response);
+            List<SteamAccountDto> fresh = accountsOf(response, accountIds);
+            if (!fresh.isEmpty()) {
+                accounts = fresh;
+            }
         } catch (RestClientException e) {
             /* Индикатор живой: лучше на минуту показать «не играет», чем
                оставить гореть то, чего уже нет. */
@@ -175,7 +232,31 @@ public class SteamAPIClientImpl implements SteamAPIClient {
             nowPlaying = Optional.empty();
         }
         nowPlayingAt = Instant.now();
-        return nowPlaying;
+    }
+
+    /* Steam возвращает профили вперемешку, а порядок в настройках —
+       осмысленный: первым стоит основной аккаунт. */
+    private static List<SteamAccountDto> accountsOf(JsonNode response, List<String> ids) {
+        if (response == null) {
+            return List.of();
+        }
+        Map<String, SteamAccountDto> byId = new LinkedHashMap<>();
+        for (JsonNode player : response.path("response").path("players")) {
+            String id = player.path("steamid").asText();
+            byId.put(id, new SteamAccountDto(
+                    id,
+                    player.path("personaname").asText(id),
+                    player.path("avatarfull").asText(player.path("avatarmedium").asText(null)),
+                    player.path("profileurl").asText("https://steamcommunity.com/profiles/" + id + "/")));
+        }
+        List<SteamAccountDto> ordered = new ArrayList<>();
+        for (String id : ids) {
+            SteamAccountDto account = byId.get(id);
+            if (account != null) {
+                ordered.add(account);
+            }
+        }
+        return List.copyOf(ordered);
     }
 
     /* gameextrainfo есть в профиле, только пока игра запущена. Аккаунтов
@@ -361,6 +442,16 @@ public class SteamAPIClientImpl implements SteamAPIClient {
             first.setImg_icon_url(second.getImg_icon_url());
         }
         return first;
+    }
+
+    /* Без таймаута запрос, на который Steam так и не ответил, висит вечно
+       и держит поток страницы. Библиотека бывает большой, поэтому чтение —
+       с запасом: это пауза между пакетами ответа, а не весь ответ целиком. */
+    private static RestTemplate timeoutedTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(10));
+        return new RestTemplate(factory);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

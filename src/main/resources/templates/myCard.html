@@ -11,6 +11,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
+    <!-- Только для надписи «GTA5 RP» под карточкой GTA: у проекта свой
+         геометрический шрифт, моноширинный рядом с ним смотрится чужим.
+         text= — отдаются лишь эти буквы, файл в пару килобайт. -->
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&text=GTA5%20RP&display=swap">
     <link rel="stylesheet" href="/css/myCard.css">
 
     <script src="/js/time.js" defer></script>
@@ -64,11 +69,24 @@
                     <span class="link-name">telegram</span>
                     <span class="link-handle">@gnaizel</span>
                 </a>
-                <a class="link-card" href="https://steamcommunity.com/id/Gnaisel/" target="_blank" rel="noopener">
-                    <img src="/image/steam-svgrepo-com.svg" alt="" aria-hidden="true">
-                    <span class="link-name">steam</span>
-                    <span class="link-handle">/Gnaisel</span>
-                </a>
+                <!-- Аккаунтов несколько, поэтому карточка сама никуда не ведёт:
+                     нажатие растягивает её вниз, и внутри появляются аватарки,
+                     каждая — ссылка на свой профиль. Справа вместо ника —
+                     сколько их, а при наведении на аватарку — чья она. -->
+                <div class="link-card steam-card">
+                    <button class="steam-head" id="steam-toggle" type="button"
+                            aria-expanded="false" aria-controls="steam-accounts">
+                        <img src="/image/steam-svgrepo-com.svg" alt="" aria-hidden="true">
+                        <span class="link-name">steam</span>
+                        <span class="link-handle steam-handle" id="steam-handle"></span>
+                        <svg class="steam-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+                    </button>
+                    <div class="steam-drawer">
+                        <div class="steam-accounts" id="steam-accounts"></div>
+                    </div>
+                </div>
                 <a class="link-card" href="https://www.last.fm/user/Gnaizel" target="_blank" rel="noopener">
                     <img src="/image/last-fm-white-icon.svg" alt="" aria-hidden="true">
                     <span class="link-name">last.fm</span>
@@ -203,7 +221,33 @@
                  заголовок говорит, про что блок, а подзаголовок — откуда
                  данные. -->
             <h2 class="panel-title">games</h2>
-            <p class="panel-sub">steam, epic and discord &middot; newest first</p>
+            <!-- Без «newest first»: порядок теперь выбирается в самом списке. -->
+            <p class="panel-sub">steam, epic and discord</p>
+
+            <!-- Откуда часы и почему их меньше, чем на самом деле. Подсказка
+                 открывается наведением, а на телефоне — нажатием.
+                 Не «game-info»: так уже называется подпись в строке списка
+                 игр, и стили одного ломали другое. -->
+            <div class="hours-note">
+                <button class="hours-note-btn" id="hours-note-btn" type="button"
+                        aria-expanded="false" aria-controls="hours-note-pop"
+                        aria-label="where these hours come from">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="7.5" x2="12" y2="12.5"></line>
+                        <line x1="12" y1="16.5" x2="12.01" y2="16.5"></line>
+                    </svg>
+                </button>
+                <div class="hours-note-pop" id="hours-note-pop" role="tooltip">
+                    <p>hours come straight from official sources &mdash;
+                        <strong>steam</strong>, <strong>fortnite tracker</strong> and others &mdash;
+                        summed across all of my accounts, and there are a lot of them.</p>
+                    <p class="hours-note-lost">some hours aren&rsquo;t counted: i&rsquo;ve lost
+                        access to a few accounts.</p>
+                </div>
+            </div>
 
             <!-- Карточка собрана здесь целиком, скрипт только меняет в ней
                  значения: так опрос не пересобирает её и она не мигает. -->
@@ -217,6 +261,23 @@
                         </div>
                         <div class="game-information">
                             <div class="game-join"><a class="join" href="#">join</a></div>
+                            <!-- Строка только для отдельных игр: видна, пока в карточке
+                                 игра с одним из этих appid, — решает скрипт. Для GTA:
+                                 часы набраны не в сюжетке, а на RP-серверах. Стоит
+                                 в общем списке, над часами, о которых и говорит;
+                                 поверх баннера она висела отдельно от всего.
+                                 Серверы — их же логотипами: у GTA5 RP звезда и надпись
+                                 их шрифтом, у Majestic — собственный вордмарк.
+                                 Только Legacy (271590): RP-серверы идут на ней,
+                                 а у Enhanced (3240220) своих часов немного, и они не RP. -->
+                            <h3 class="game-note" data-appids="271590" hidden>
+                                <span>rp servers:</span>
+                                <a class="rp-link" href="https://gta5rp.com/" target="_blank" rel="noopener">
+                                    <img class="rp-star" src="/image/rp/gta5rp.png" alt="" aria-hidden="true">
+                                    <span class="rp-name"><b>GTA5</b> RP</span></a>
+                                <a class="rp-link" href="https://majestic-rp.ru/" target="_blank" rel="noopener">
+                                    <img class="rp-wordmark" src="/image/rp/majestic.svg" alt="Majestic"></a>
+                            </h3>
                             <h3 class="playtime-forever"><span>playtime forever: <span id="lg-forever">--</span></span></h3>
                             <h3 class="playtime-2weeks"><span>playtime 2 weeks: <span id="lg-2weeks">--</span></span></h3>
                             <h3 class="playtime-sessions"><span>last played: <span id="lg-last">--</span></span></h3>
@@ -225,11 +286,22 @@
                     <div class="info-box">
                         <div id="playtime-in-total" class="playtime-in-total">
                             <img src="/image/clock.png" alt="" aria-hidden="true">
-                            <h2 class="playtime">all time: <span class="num">--</span><span class="unit" hidden> h</span></h2>
+                            <h2 class="playtime">all time</h2>
+                            <!-- Одометр «часы h минуты m»: барабаны под каждую цифру
+                                 строит скрипт, когда придут часы. Для чтения вслух
+                                 число целиком лежит в aria-label. -->
+                            <span class="odo" id="hours-odo" role="img" aria-label="loading"><span class="odo-wait">--</span></span>
                         </div>
                     </div>
                 </div>
                 <div class="game-right-section">
+                    <!-- Два вида списка — просто словами, как фильтры ленты:
+                         основной по последнему запуску и по наигранным часам.
+                         Второй вид грузится, только когда его выбрали. -->
+                    <div class="game-sort" id="game-sort" role="group" aria-label="sort games">
+                        <button class="game-sort-btn" type="button" data-mode="recent" aria-pressed="true">recent</button>
+                        <button class="game-sort-btn" type="button" data-mode="hours" aria-pressed="false">most played</button>
+                    </div>
                     <div id="game-lib" class="game-lib"></div>
                 </div>
             </div>

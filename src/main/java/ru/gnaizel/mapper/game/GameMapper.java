@@ -27,9 +27,12 @@ public class GameMapper {
         String fmtTwoWeeks = formatPlaytime(playtime2weeks);
         String fmtForever = formatPlaytime(playtimeForever);
 
-        String lastPlayed = game.getRtime_last_played() != null
-                ? game.getRtime_last_played().format(formatter)
-                : null;
+        /* Ноль у Steam значит «не знаю», а не 1970 год: у давно заброшенных
+           игр часы есть, а даты последнего запуска нет. */
+        LocalDateTime last = game.getRtime_last_played();
+        boolean known = last != null && last.getYear() > 1970;
+        String lastPlayed = known ? last.format(formatter) : "—";
+        Long lastPlayedAt = known ? last.atZone(ZoneId.of("UTC+4")).toEpochSecond() : null;
 
         return GameDto.builder()
                 .appid(game.getAppid())
@@ -39,6 +42,7 @@ public class GameMapper {
                 .img_icon_url(game.getImg_icon_url())
                 .banner_url(game.getBanner_url())
                 .rtime_last_played(lastPlayed)
+                .lastPlayedAt(lastPlayedAt)
                 .playtime_disconnected(game.getPlaytime_disconnected())
                 .playingNow(playingNow)
                 .joinUrl(joinUrl)
@@ -96,6 +100,7 @@ public class GameMapper {
                 .playtime_2weeks("—")
                 .rtime_last_played(LocalDateTime.now(ZoneId.of("UTC+4"))
                         .format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")))
+                .lastPlayedAt(Instant.now().getEpochSecond())
                 .playingNow(true)
                 .build();
     }

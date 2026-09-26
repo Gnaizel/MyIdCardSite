@@ -1,5 +1,6 @@
 package ru.gnaizel.service.games;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,8 +60,19 @@ public class GameServiceImpl implements GameService {
        список часто — спрашиваем его один раз на приложение. */
     private final Map<String, DiscordAppArt.Art> art = new ConcurrentHashMap<>();
 
+    /* Сколько игр в одной странице списка. */
     @Value("${steam.recent-limit:12}")
     private int limit;
+
+    /* Программы из библиотеки Steam (ShareX, обои и т.п.): Steam считает их
+       наравне с играми, но ни в списках, ни в часах им не место. */
+    @Value("${steam.not-games:}")
+    private String notGames;
+    private Set<Integer> notGameIds = Set.of();
+
+    /* Больше за раз не отдаём: страница просит по дюжине, а огромный limit
+       из адресной строки не должен выгружать всю библиотеку одним ответом. */
+    private static final int MAX_PAGE = 60;
 
     @Value("${fortnite.title:Fortnite}")
     private String fortniteTitle;
@@ -74,17 +86,42 @@ public class GameServiceImpl implements GameService {
     private volatile Library cached;
     private volatile Instant cachedAt;
 
+    @PostConstruct
+    void parseNotGames() {
+        notGameIds = Arrays.stream(notGames.split(","))
+                .map(String::trim)
+                .filter(id -> id.matches("\\d+"))
+                .map(Integer::valueOf)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /* Запущенная программа — это не «играет сейчас». */
+    private Optional<NowPlayingDto> nowPlaying() {
+        return steamAPIClient.getNowPlaying().filter(playing -> !notGameIds.contains(playing.getAppid()));
+    }
+
+    @Override
+    public List<GameDto> getGames(Sort sort, int offset, int limit) {
+        List<GameDto> all = sort == Sort.HOURS ? mostPlayed() : recent();
+        if (all.isEmpty()) {
+            throw new GameFiltrationError("ERROR IN getGames: games list is empty");
+        }
+        int size = limit <= 0 ? this.limit : Math.min(limit, MAX_PAGE);
+        int from = Math.min(Math.max(offset, 0), all.size());
+        int to = Math.min(from + size, all.size());
+        return List.copyOf(all.subList(from, to));
+    }
+
     /**
-     * Последние запущенные игры, без ограничения по сроку давности.
+     * Запущенные игры, самые свежие первыми, без ограничения по сроку давности.
      * <p>
      * Раньше список строился пересечением библиотеки с ответом
      * GetRecentlyPlayedGames, а тот отдаёт только последние две недели. Стоило
      * неделю не играть — пересечение пустело, и блок на странице исчезал
      * целиком. Время последнего запуска есть у каждой игры в библиотеке,
-     * так что достаточно отсортировать по нему и взять сколько нужно.
+     * так что достаточно отсортировать по нему.
      */
-    @Override
-    public List<GameDto> getRecentlyGames() {
+    private List<GameDto> recent() {
         Library library = library();
 
         List<Game> games = new ArrayList<>(library.steam().stream()
@@ -103,7 +140,7 @@ public class GameServiceImpl implements GameService {
            в библиотеке: Steam обновляет время последнего запуска не сразу,
            и пока он думает, игра стояла бы в списке на вчерашнем месте.
            А «играю прямо сейчас» — это и есть самое свежее, что может быть. */
-        Optional<NowPlayingDto> now = steamAPIClient.getNowPlaying();
+        Optional<NowPlayingDto> now = nowPlaying();
         now.ifPresent(playing -> {
             int at = indexOf(games, playing.getAppid());
             if (at >= 0) {
@@ -140,23 +177,10 @@ public class GameServiceImpl implements GameService {
             }
         }
 
-        int playingAppid = now.map(NowPlayingDto::getAppid).orElse(-1);
-        String joinUrl = now.map(NowPlayingDto::getJoinUrl).orElse(null);
+        Playing current = new Playing(now.map(NowPlayingDto::getAppid).orElse(-1), discordGame,
+                now.map(NowPlayingDto::getJoinUrl).orElse(null));
         List<GameDto> recent = new ArrayList<>(games.stream()
-                .map(game -> {
-                    boolean playing = game.getAppid() != 0
-                            ? game.getAppid() == playingAppid
-                            : !discordGame.isEmpty() && GameMapper.sameName(game.getName()).equals(discordGame);
-                    GameDto dto = GameMapper.gameToGameDto(game, playing, playing ? joinUrl : null);
-                    /* Идёт игра, а Steam пишет ноль часов — значит, он их не
-                       знает: по Family Sharing часы у одолжившего не видны
-                       в API ни в одной библиотеке. «0m» тут была бы неправдой. */
-                    if (playing && game.getAppid() != 0 && game.getPlaytime_forever() == 0) {
-                        dto.setPlaytime_forever("—");
-                        dto.setPlaytime_2weeks("—");
-                    }
-                    return dto;
-                })
+                .map(game -> toDto(game, current))
                 .toList());
 
         /* Игру, которой нет ни в Steam, ни в Fortnite API, знает только
@@ -170,15 +194,50 @@ public class GameServiceImpl implements GameService {
                     found.map(DiscordAppArt.Art::icon).orElse(null),
                     found.map(DiscordAppArt.Art::banner).orElse(null)));
         }
-        if (recent.size() > limit) {
-            recent = recent.subList(0, limit);
-        }
-
-        if (recent.isEmpty()) {
-            throw new GameFiltrationError("ERROR IN getRecentlyGames: games list is empty");
-        }
-
         return recent;
+    }
+
+    /* Самые наигранные первыми. Здесь все игры с часами, в том числе без
+       даты запуска: у давно заброшенных Steam её не хранит, а часы помнит.
+       Игру, которую знает только Discord, сюда не ставим — часов у неё нет. */
+    private List<GameDto> mostPlayed() {
+        Library library = library();
+        List<Game> games = new ArrayList<>(library.steam().stream()
+                .filter(gog -> gog.getPlaytime_forever() > 0)
+                .map(GameMapper::gogDtoToGame)
+                .toList());
+        library.fortnite().ifPresent(stats -> games.add(
+                GameMapper.fortniteToGame(stats, fortniteTitle, fortniteIcon, fortniteBanner)));
+        games.sort(Comparator.comparingInt(Game::getPlaytime_forever).reversed());
+
+        /* «Играет сейчас» и здесь: запущенная игра в любом месте списка
+           должна гореть так же, как в основном виде. */
+        Optional<NowPlayingDto> now = nowPlaying();
+        String discordGame = now.isPresent() ? "" : presenceService.nowPlaying()
+                .filter(p -> !ignored(p.getGame()))
+                .map(PresenceDto::getGame)
+                .map(GameMapper::sameName)
+                .orElse("");
+        Playing playing = new Playing(now.map(NowPlayingDto::getAppid).orElse(-1), discordGame,
+                now.map(NowPlayingDto::getJoinUrl).orElse(null));
+        return games.stream().map(game -> toDto(game, playing)).toList();
+    }
+
+    /* Запущена ли игра, у игр из Steam узнаём по appid, у остальных —
+       по имени из Discord. */
+    private static GameDto toDto(Game game, Playing now) {
+        boolean playing = game.getAppid() != 0
+                ? game.getAppid() == now.appid()
+                : !now.discordGame().isEmpty() && GameMapper.sameName(game.getName()).equals(now.discordGame());
+        GameDto dto = GameMapper.gameToGameDto(game, playing, playing ? now.joinUrl() : null);
+        /* Идёт игра, а Steam пишет ноль часов — значит, он их не
+           знает: по Family Sharing часы у одолжившего не видны
+           в API ни в одной библиотеке. «0m» тут была бы неправдой. */
+        if (playing && game.getAppid() != 0 && game.getPlaytime_forever() == 0) {
+            dto.setPlaytime_forever("—");
+            dto.setPlaytime_2weeks("—");
+        }
+        return dto;
     }
 
     private static int indexOf(List<Game> games, int appid) {
@@ -213,7 +272,7 @@ public class GameServiceImpl implements GameService {
         if (library.fortnite().isPresent()) {
             names.add(GameMapper.sameName(fortniteTitle));
         }
-        steamAPIClient.getNowPlaying().ifPresent(playing -> names.add(GameMapper.sameName(playing.getName())));
+        nowPlaying().ifPresent(playing -> names.add(GameMapper.sameName(playing.getName())));
         names.remove("");
         return names;
     }
@@ -253,7 +312,11 @@ public class GameServiceImpl implements GameService {
         boolean complete = false;
         try {
             SteamAPIClient.Library answer = steamAPIClient.getAllGameLib();
-            steam = answer.games();
+            /* Программы отсеиваем здесь, один раз: всё остальное — списки,
+               общие часы, лента — строится уже из отфильтрованного. */
+            steam = answer.games().stream()
+                    .filter(game -> !notGameIds.contains(game.getAppid()))
+                    .toList();
             complete = answer.complete();
         } catch (RuntimeException e) {
             /* Steam мог не ответить, но Fortnite при этом жив — отдадим хоть
@@ -284,5 +347,9 @@ public class GameServiceImpl implements GameService {
 
     private record Library(List<GOGSteamResponseDto> steam, Optional<FortniteStatsDto> fortnite,
                            boolean complete) {
+    }
+
+    /* Что запущено прямо сейчас: appid из Steam или имя из Discord. */
+    private record Playing(int appid, String discordGame, String joinUrl) {
     }
 }

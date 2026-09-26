@@ -426,28 +426,66 @@ let gamesByKey = new Map();
 let selectedGameKey = null;   // выбрана кликом; null — показываем самую свежую
 let shownGameKey = null;
 
+/* Список справа в двух видах: recent — по последнему запуску (основной)
+   и hours — по наигранным часам. Каждый грузится страницами и только
+   когда нужен: кто зашёл посмотреть, не качает ни второй вид, ни хвост
+   списка — только первую страницу основного, как и раньше. */
+const GAME_PAGE = 12;
+const GAME_POLL_MAX = 60;   // больше строк за раз сервер не отдаёт
+const GAME_ICON_FALLBACK = '/image/game-icon.jpg';
+const gameLists = {
+    recent: { items: [], loaded: false, done: false, loading: false },
+    hours:  { items: [], loaded: false, done: false, loading: false },
+};
+let gameMode = 'recent';
+
 /* У Fortnite appid нет (0), так что ключ по одному appid склеил бы любые
    две игры без него. */
 function gameKey(game) {
     return game.appid ? String(game.appid) : 'name:' + (game.name ?? '');
 }
 
-function displayMyGameLib() {
-    fetch('/games')
+function fetchGames(mode, offset, limit) {
+    return fetch(`/games?sort=${mode}&offset=${offset}&limit=${limit}`)
         .then(rep => {
             if (!rep.ok) throw new Error('HTTP ' + rep.status);
             return rep.json();
-        })
+        });
+}
+
+function rememberGames(list) {
+    list.forEach(game => gamesByKey.set(gameKey(game), game));
+}
+
+/* Опрос освежает уже загруженное, но не больше GAME_POLL_MAX строк.
+   Свежая голова встаёт на место старой, а хвост, догруженный прокруткой,
+   остаётся — без тех игр, что за это время переехали наверх. */
+function refreshGames(mode) {
+    const list = gameLists[mode];
+    const limit = Math.min(Math.max(list.items.length, GAME_PAGE), GAME_POLL_MAX);
+    const covered = list.items.length <= limit;
+    return fetchGames(mode, 0, limit).then(data => {
+        const keys = new Set(data.map(gameKey));
+        list.items = data.concat(list.items.slice(data.length).filter(game => !keys.has(gameKey(game))));
+        list.loaded = true;
+        if (covered) list.done = data.length < limit;
+        rememberGames(data);
+        if (gameMode === mode) displayGameLib(list.items);
+        return data;
+    });
+}
+
+function displayMyGameLib() {
+    refreshGames('recent')
         .then(data => {
             /* Самую свежую игру больше не выбрасываем из списка: без неё
                нумерация начиналась со второй, и «01» стояло не у той игры,
                что показана крупно слева. */
             gamePlaying = data.some(game => game.playingNow);
-            gamesByKey = new Map(data.map(game => [gameKey(game), game]));
-            displayGameLib(data);
             /* Выбранная кликом игра остаётся выбранной и после опроса:
                раньше каждые полминуты крупный блок сам перескакивал
-               обратно на первую. */
+               обратно на первую. Без выбора крупно — самая свежая, в каком
+               бы виде ни был список справа. */
             showGame((selectedGameKey && gamesByKey.get(selectedGameKey)) || data[0]);
             /* Общие часы одни на весь блок и от выбранной игры не зависят,
                поэтому запрашиваются вместе со списком, а не на каждый клик. */
@@ -463,7 +501,94 @@ function displayMyGameLib() {
                 gameLib.innerHTML = '<p>Ошибка загрузки игр.</p>';
             }
         });
+
+    // второй вид освежаем, только пока его смотрят
+    if (gameMode === 'hours' && gameLists.hours.loaded) {
+        refreshGames('hours').catch(err => console.error('Ошибка при обновлении списка игр:', err));
+    }
 }
+
+/* Следующая страница — когда список докрутили почти до конца. */
+function loadMoreGames() {
+    const mode = gameMode;
+    const list = gameLists[mode];
+    if (list.loading || list.done) return;
+    list.loading = true;
+    fetchGames(mode, list.items.length, GAME_PAGE)
+        .then(data => {
+            const keys = new Set(list.items.map(gameKey));
+            list.items = list.items.concat(data.filter(game => !keys.has(gameKey(game))));
+            list.loaded = true;
+            list.done = data.length < GAME_PAGE;
+            rememberGames(data);
+            if (gameMode === mode) {
+                displayGameLib(list.items);
+                markSelected(shownGameKey);
+            }
+        })
+        .catch(err => console.error('Ошибка при подгрузке игр:', err))
+        .finally(() => {
+            list.loading = false;
+            if (gameMode === mode) document.getElementById('game-lib')?.classList.remove('is-loading');
+        });
+}
+
+/* Второй вид при первом выборе догружается, дальше переключение
+   мгновенное: оба списка уже в памяти. */
+function setGameMode(mode) {
+    if (mode === gameMode || !gameLists[mode]) return;
+    gameMode = mode;
+    document.querySelectorAll('#game-sort .game-sort-btn').forEach(btn =>
+        btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode)));
+
+    const gameLib = document.getElementById('game-lib');
+    if (!gameLib) return;
+    gameLib.scrollTop = 0;
+    const list = gameLists[mode];
+    if (list.loaded) {
+        // цифры справа у всех строк другие — без вспышки на каждой
+        displayGameLib(list.items, true);
+        markSelected(shownGameKey);
+        return;
+    }
+    gameLib.classList.add('is-loading');
+    loadMoreGames();
+}
+
+/* Справа в строке: в основном виде — сколько прошло с последнего запуска,
+   в виде по часам — сами часы. */
+function gameStat(game) {
+    return gameMode === 'hours' ? game.playtime_forever : timeAgo(game.lastPlayedAt);
+}
+
+/* Коротко, чтобы влезло туда же, где раньше стояли часы. */
+function timeAgo(seconds) {
+    if (!seconds) return '—';
+    const minutes = Math.max(0, Date.now() / 1000 - seconds) / 60;
+    const hours = minutes / 60;
+    const days = hours / 24;
+    if (minutes < 1) return 'just now';
+    if (hours < 1) return Math.floor(minutes) + 'm ago';
+    if (days < 1) return Math.floor(hours) + 'h ago';
+    if (days < 7) return Math.floor(days) + 'd ago';
+    if (days < 30) return Math.floor(days / 7) + 'w ago';
+    if (days < 365) return Math.floor(days / 30) + 'mo ago';
+    return Math.floor(days / 365) + 'y ago';
+}
+
+(function setupGameList() {
+    const gameLib = document.getElementById('game-lib');
+    const sort = document.getElementById('game-sort');
+    if (!gameLib || !sort) return;
+
+    sort.addEventListener('click', event => {
+        const btn = event.target.closest('.game-sort-btn');
+        if (btn) setGameMode(btn.dataset.mode);
+    });
+    gameLib.addEventListener('scroll', () => {
+        if (gameLib.scrollTop + gameLib.clientHeight >= gameLib.scrollHeight - 60) loadMoreGames();
+    }, { passive: true });
+})();
 
 /* Крупный блок показывает выбранную игру, а не только самую свежую:
    по клику в списке сюда приезжает статистика любой из них. */
@@ -494,6 +619,13 @@ function showGame(game) {
     const title = card.querySelector('.last-game-title');
     setText(title, game.name, false);
     if (title) title.title = game.name ?? '';
+
+    /* Подпись под названием есть не у всех игр — только у тех, чей appid
+       перечислен у неё в разметке. */
+    card.querySelectorAll('.game-note').forEach(note => {
+        const appids = (note.dataset.appids || '').split(/\s+/);
+        note.hidden = !appids.includes(String(game.appid));
+    });
 
     /* Классом на блоке, а не на самом индикаторе: так же, как у трека,
        и CSS остаётся одним правилом на оба списка. */
@@ -553,14 +685,21 @@ function makeGameItem() {
         '</div>' +
         '<span class="live">in game</span>';
 
+    /* Steam хранит ссылки на иконки и у тех игр, чьих картинок у него уже
+       нет: без заглушки строка стояла бы с дыркой. */
+    const img = el.querySelector('img');
+    img.addEventListener('error', () => {
+        if (!img.src.endsWith(GAME_ICON_FALLBACK)) img.src = GAME_ICON_FALLBACK;
+    });
+
     /* Игру берём по ключу в момент клика, а не замыкаем при создании:
        плитка живёт между опросами, и замкнутые данные устарели бы. */
     el.addEventListener('click', () => {
         const game = gamesByKey.get(el.dataset.key);
         if (!game) return;
-        // клик по первой — снова «следить за самой свежей»
+        // клик по первой в основном виде — снова «следить за самой свежей»
         const first = document.querySelector('#game-lib .game');
-        selectedGameKey = first === el ? null : el.dataset.key;
+        selectedGameKey = gameMode === 'recent' && first === el ? null : el.dataset.key;
         showGame(game);
     });
     return el;
@@ -571,21 +710,26 @@ function paintGameItem(el, game, animate) {
 
     const img = el.querySelector('img');
     const icon = game.img_icon_url ?? '';
-    // src трогаем только при смене, иначе иконка моргает на каждом опросе
-    if (img.getAttribute('src') !== icon) img.setAttribute('src', icon);
+    /* src трогаем только при смене, иначе иконка моргает на каждом опросе.
+       Сравниваем с тем, что просили, а не с src: у битой иконки там
+       заглушка, и опрос иначе каждый раз ставил бы битую ссылку заново. */
+    if (img.dataset.icon !== icon) {
+        img.dataset.icon = icon;
+        img.setAttribute('src', icon || GAME_ICON_FALLBACK);
+    }
 
     const title = el.querySelector('.game-title');
     setText(title, game.name, false);
     title.title = game.name ?? '';
 
-    setText(el.querySelector('.playtime-forever'), game.playtime_forever, animate);
+    setText(el.querySelector('.playtime-forever'), gameStat(game), animate);
     el.classList.toggle('playing', Boolean(game.playingNow));
 }
 
 /* Плитки переиспользуются по ключу игры. Если порядок поменялся — например,
    запущенная игра поднялась наверх, — плитки доезжают до новых мест,
    а не перескакивают. */
-function displayGameLib(data) {
+function displayGameLib(data, quiet = false) {
     const gameLib = document.getElementById('game-lib');
     if (!gameLib) return;
 
@@ -611,7 +755,7 @@ function displayGameLib(data) {
         } else {
             existing.delete(key);
         }
-        paintGameItem(el, game, !fresh);
+        paintGameItem(el, game, !fresh && !quiet);
         if (gameLib.children[i] !== el) {
             gameLib.insertBefore(el, gameLib.children[i] || null);
         }
@@ -633,9 +777,8 @@ function displayGameLib(data) {
 }
 
 function displayTotalHours() {
-    const num = document.querySelector('#playtime-in-total .num');
-    const unit = document.querySelector('#playtime-in-total .unit');
-    if (!num) return;
+    const odo = document.getElementById('hours-odo');
+    if (!odo) return;
 
     fetch('games-total-hours')
         .then(resp => {
@@ -643,19 +786,136 @@ function displayTotalHours() {
             return resp.text();
         })
         .then(data => {
-            const trimmed = data.trim();
-            const value = Number(trimmed);
-            const display = Number.isFinite(value)
-                ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                : trimmed;
-            setText(num, display, true);
-            if (unit) unit.hidden = false;
+            const hours = Number(data.trim());
+            if (!Number.isFinite(hours)) throw new Error('not a number: ' + data);
+            /* Дробь часа — это минуты: «5623 h 10 m» читается сразу,
+               а «5623.17 h» приходилось пересчитывать в уме. */
+            const minutes = Math.round(hours * 60);
+            const text = Math.floor(minutes / 60) + 'h' + String(minutes % 60).padStart(2, '0') + 'm';
+            setOdometer(odo, text, minutes);
         })
         .catch(err => {
             console.error(err);
             // уже показанное число лучше, чем «unavailable» из-за одного сбоя
-            if (num.textContent === '--') setText(num, 'unavailable', false);
+            if (!odo.querySelector('.odo-drum')) {
+                odo.innerHTML = '<span class="odo-wait">unavailable</span>';
+                odo.setAttribute('aria-label', 'unavailable');
+            }
         });
+}
+
+/* Общие часы — одометром. У каждой цифры свой барабан-десятигранник
+   (см. CSS), и --turn — сколько цифр он прокрутил с нуля: угол растёт
+   без предела, поэтому барабан просто крутится дальше, без перемоток
+   ленты. Первый раз барабаны раскручиваются с нуля, когда счётчик
+   показался на экране, — правые дольше и на лишние обороты, как у
+   настоящего счётчика. Потом докручиваются только сменившиеся цифры.
+   Останавливается барабан с лёгким перекатом и возвратом, как колесо
+   с фиксатором. */
+const ODO_OVERSHOOT = 0.14;   // на какую долю цифры барабан проскакивает перед щелчком
+const ODO_WHEEL = '<span class="odo-wheel">'
+    + [...Array(10).keys()].map(d => `<span class="odo-face" style="--i:${d}">${d}</span>`).join('')
+    + '</span>';
+
+function turnWheel(wheel, turn, seconds) {
+    const from = Number(wheel.dataset.turn || 0);
+    wheel.dataset.turn = String(turn);
+    if (reducedMotion()) {
+        wheel.style.setProperty('--turn', turn);
+        return;
+    }
+    wheel.style.setProperty('--dur', seconds.toFixed(2) + 's');
+    wheel.style.setProperty('--ease', 'cubic-bezier(.16, .84, .3, 1)');
+    wheel.style.setProperty('--turn', turn + (turn >= from ? ODO_OVERSHOOT : -ODO_OVERSHOOT));
+    wheel.addEventListener('transitionend', function settle() {
+        wheel.removeEventListener('transitionend', settle);
+        // пока крутился, попросили другую цифру — щёлкать будет уже она
+        if (wheel.dataset.turn !== String(turn)) return;
+        wheel.style.setProperty('--dur', '.2s');
+        wheel.style.setProperty('--ease', 'cubic-bezier(.3, 0, .2, 1)');
+        wheel.style.setProperty('--turn', turn);
+    });
+}
+
+/* Раскрутка — один раз и только когда счётчик на экране: при загрузке
+   он обычно ниже края, и анимацию никто бы не увидел. */
+function spinUpOdometer(odo) {
+    const wheels = [...odo.querySelectorAll('.odo-wheel')];
+    const digits = odo.dataset.text.replace(/\D/g, '');
+    odo.dataset.spun = '1';
+    wheels.forEach((wheel, i) => {
+        const fromRight = wheels.length - 1 - i;
+        const turns = fromRight === 0 ? 3 : fromRight < 3 ? 2 : 1;
+        turnWheel(wheel, 10 * turns + Number(digits[i]), 1.1 + 0.16 * i);
+    });
+}
+
+function whenVisible(el, run) {
+    if (!('IntersectionObserver' in window)) {
+        run();
+        return;
+    }
+    const watcher = new IntersectionObserver(entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        watcher.disconnect();
+        run();
+    }, { threshold: 0.6 });
+    watcher.observe(el);
+}
+
+/* text — цифры и буквы единиц, например «5623h10m»: цифры встают на
+   барабаны, буквы — подписями между ними. value — то же число одним
+   значением, чтобы знать, в какую сторону крутить. */
+function setOdometer(odo, text, value) {
+    if (odo.dataset.text === text) return;
+    const before = Number(odo.dataset.value);
+    odo.dataset.text = text;
+    odo.dataset.value = String(value);
+    odo.setAttribute('aria-label', text.replace('h', ' hours ').replace('m', ' minutes'));
+
+    /* Сменилась форма числа (появился новый разряд) или его ещё не было —
+       барабаны строятся заново, стоят на нулях и ждут раскрутки. */
+    const shape = text.replace(/\d/g, '0');
+    if (odo.dataset.shape !== shape) {
+        odo.dataset.shape = shape;
+        odo.dataset.spun = '';
+        odo.innerHTML = '';
+        let minor = false;   // после первой единицы — младшие разряды, они тише
+        for (const ch of text) {
+            if (/\d/.test(ch)) {
+                const drum = document.createElement('span');
+                drum.className = minor ? 'odo-drum is-minor' : 'odo-drum';
+                drum.setAttribute('aria-hidden', 'true');
+                drum.innerHTML = ODO_WHEEL;
+                odo.appendChild(drum);
+            } else {
+                const unit = document.createElement('span');
+                unit.className = 'odo-unit';
+                unit.setAttribute('aria-hidden', 'true');
+                unit.textContent = ch;
+                odo.appendChild(unit);
+                minor = true;
+            }
+        }
+        whenVisible(odo, () => spinUpOdometer(odo));
+        return;
+    }
+
+    // ещё не раскручен — раскрутка сама встанет на последнее число
+    if (!odo.dataset.spun) return;
+
+    const digits = text.replace(/\D/g, '');
+    odo.querySelectorAll('.odo-wheel').forEach((wheel, i) => {
+        const turn = Number(wheel.dataset.turn || 0);
+        const current = ((turn % 10) + 10) % 10;
+        const digit = Number(digits[i]);
+        if (current === digit) return;
+        // часы растут — крутим вперёд; упали (исключили программу) — назад
+        const steps = value >= before
+            ? (digit - current + 10) % 10
+            : -((current - digit + 10) % 10);
+        turnWheel(wheel, turn + steps, 0.55 + Math.abs(steps) * 0.06);
+    });
 }
 
 /* Баннер меняется, только когда сменилась картинка. Новый сначала
@@ -1198,3 +1458,104 @@ fetch('/tiktok')
     .then(response => response.json())
     .then(displayTikTok)
     .catch(err => console.error('Ошибка при получении репостов TikTok:', err));
+
+/* Все аккаунты Steam — аватарками внутри карточки steam. Нажатие
+   растягивает карточку вниз; если аккаунты так и не пришли, разворачивать
+   нечего, и нажатие просто открывает основной профиль. */
+const STEAM_MAIN = 'https://steamcommunity.com/id/Gnaisel/';
+
+function setupSteamCard(accounts) {
+    const toggle = document.getElementById('steam-toggle');
+    const list = document.getElementById('steam-accounts');
+    const handle = document.getElementById('steam-handle');
+    const card = toggle && toggle.closest('.steam-card');
+    if (!toggle || !list || !handle || !card) return;
+
+    if (!accounts.length) {
+        card.classList.add('no-accounts');
+        handle.textContent = '/Gnaisel';
+        toggle.removeAttribute('aria-expanded');
+        toggle.removeAttribute('aria-controls');
+        toggle.addEventListener('click', () => window.open(STEAM_MAIN, '_blank', 'noopener'));
+        return;
+    }
+
+    /* Справа в карточке — сколько аккаунтов, а пока наведена аватарка —
+       чья она: подсказка браузера появляется с задержкой и выглядит чужой. */
+    const summary = accounts.length === 1 ? '1 account' : `${accounts.length} accounts`;
+    const showName = name => {
+        handle.textContent = name || summary;
+        handle.classList.toggle('is-name', Boolean(name));
+    };
+    showName(null);
+
+    list.innerHTML = '';
+    accounts.forEach((account, index) => {
+        const link = document.createElement('a');
+        link.className = 'steam-account';
+        link.href = account.profileUrl;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.setAttribute('aria-label', account.name);
+        link.style.setProperty('--i', index);
+        // в свёрнутой карточке невидимые ссылки не должны ловить Tab
+        link.tabIndex = -1;
+        link.addEventListener('mouseenter', () => showName(account.name));
+        link.addEventListener('focus', () => showName(account.name));
+        link.addEventListener('mouseleave', () => showName(null));
+        link.addEventListener('blur', () => showName(null));
+
+        const img = document.createElement('img');
+        img.dataset.src = account.avatarUrl;
+        img.alt = '';
+        link.appendChild(img);
+
+        list.appendChild(link);
+    });
+
+    /* Аватарки качаются, только когда карточку собираются открыть: навели
+       на неё, сфокусировали или нажали. Иначе шесть картинок грузились бы
+       у каждого, кто зашёл, хотя раскрывают карточку единицы. */
+    const loadAvatars = () => list.querySelectorAll('img[data-src]').forEach(img => {
+        img.src = img.dataset.src;
+        img.removeAttribute('data-src');
+    });
+    toggle.addEventListener('pointerenter', loadAvatars, { once: true });
+    toggle.addEventListener('focus', loadAvatars, { once: true });
+
+    toggle.addEventListener('click', () => {
+        loadAvatars();
+        const open = !card.classList.contains('open');
+        card.classList.toggle('open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        list.querySelectorAll('a').forEach(link => { link.tabIndex = open ? 0 : -1; });
+        if (!open) showName(null);
+    });
+}
+
+fetch('/steam/accounts')
+    .then(response => response.json())
+    .then(setupSteamCard)
+    .catch(err => {
+        console.error('Ошибка при получении аккаунтов Steam:', err);
+        setupSteamCard([]);
+    });
+
+/* Подсказка про часы в блоке игр: наведение показывает её через CSS,
+   нажатие закрепляет, нажатие мимо или Esc — убирает. */
+(function setupHoursNote() {
+    const btn = document.getElementById('hours-note-btn');
+    if (!btn) return;
+    const set = open => btn.setAttribute('aria-expanded', String(open));
+    btn.addEventListener('click', event => {
+        event.stopPropagation();
+        set(btn.getAttribute('aria-expanded') !== 'true');
+    });
+    document.addEventListener('click', event => {
+        if (!btn.parentElement.contains(event.target)) set(false);
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') set(false);
+    });
+})();
+

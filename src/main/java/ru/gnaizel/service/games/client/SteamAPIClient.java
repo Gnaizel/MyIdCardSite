@@ -2,6 +2,7 @@ package ru.gnaizel.service.games.client;
 
 import ru.gnaizel.dto.games.GOGSteamResponseDto;
 import ru.gnaizel.dto.games.NowPlayingDto;
+import ru.gnaizel.dto.games.SteamAccountDto;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,12 @@ public interface SteamAPIClient {
      * библиотек.
      */
     Optional<NowPlayingDto> getNowPlaying();
+
+    /**
+     * Профили всех аккаунтов в том порядке, в каком они перечислены
+     * в настройках. Берутся из того же запроса, что и {@link #getNowPlaying()}.
+     */
+    List<SteamAccountDto> getAccounts();
 
     /**
      * @param complete все ли аккаунты ответили. Неполную библиотеку нельзя
