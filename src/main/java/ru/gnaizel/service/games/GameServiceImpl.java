@@ -109,10 +109,16 @@ public class GameServiceImpl implements GameService {
             if (at >= 0) {
                 games.add(0, games.remove(at));
             } else {
-                /* Игры нет в библиотеке — значит запустили впервые, и до
-                   следующего обновления библиотеки её неоткуда взять.
-                   Показываем то, что знаем из профиля: название и appid. */
-                games.add(0, GameMapper.nowPlayingToGame(playing));
+                /* Среди запущенных игры нет: её запустили впервые, или она
+                   чужая по Family Sharing — тогда в библиотеке её нет вовсе,
+                   а у владельца она числится с нулём часов и без запусков.
+                   Иконку берём из любой библиотеки, где игра есть, остальное —
+                   из профиля. */
+                GOGSteamResponseDto owned = library.steam().stream()
+                        .filter(game -> game.getAppid() == playing.getAppid())
+                        .findFirst()
+                        .orElse(null);
+                games.add(0, GameMapper.nowPlayingToGame(playing, owned));
             }
         });
 
@@ -141,7 +147,15 @@ public class GameServiceImpl implements GameService {
                     boolean playing = game.getAppid() != 0
                             ? game.getAppid() == playingAppid
                             : !discordGame.isEmpty() && GameMapper.sameName(game.getName()).equals(discordGame);
-                    return GameMapper.gameToGameDto(game, playing, playing ? joinUrl : null);
+                    GameDto dto = GameMapper.gameToGameDto(game, playing, playing ? joinUrl : null);
+                    /* Идёт игра, а Steam пишет ноль часов — значит, он их не
+                       знает: по Family Sharing часы у одолжившего не видны
+                       в API ни в одной библиотеке. «0m» тут была бы неправдой. */
+                    if (playing && game.getAppid() != 0 && game.getPlaytime_forever() == 0) {
+                        dto.setPlaytime_forever("—");
+                        dto.setPlaytime_2weeks("—");
+                    }
+                    return dto;
                 })
                 .toList());
 

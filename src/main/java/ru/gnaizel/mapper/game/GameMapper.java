@@ -63,10 +63,17 @@ public class GameMapper {
     /* Fortnite приходит не из Steam, поэтому ни appid, ни картинок у него нет:
        название и изображения задаются настройками. В остальном это такая же
        строка списка — часы и время последнего запуска на своих местах. */
-    /* Игра, о которой известно только из профиля: её ещё нет в библиотеке,
-       потому что Steam обновляет её с задержкой. Часов не знаем, но картинки
-       по appid соберутся те же самые. */
-    public static Game nowPlayingToGame(NowPlayingDto playing) {
+    /* Запущенная игра, которой нет среди запущенных в библиотеке. Если она
+       хоть где-то числится (в том числе с нулём часов у владельца по Family
+       Sharing), иконку и часы берём оттуда: без хеша иконки её не собрать.
+       Иначе известно только то, что в профиле, — название и appid. */
+    public static Game nowPlayingToGame(NowPlayingDto playing, GOGSteamResponseDto owned) {
+        if (owned != null) {
+            Game game = gogDtoToGame(owned);
+            game.setName(playing.getName());
+            game.setRtime_last_played(LocalDateTime.now(ZoneId.of("UTC+4")));
+            return game;
+        }
         Game game = new Game();
         game.setAppid(playing.getAppid());
         game.setName(playing.getName());
