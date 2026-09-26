@@ -99,6 +99,13 @@ public class SteamAPIClientImpl implements SteamAPIClient {
     @Value("${steam.ids:}")
     private String ids;
 
+    /* Свой ключ аккаунта, через запятую «steamid:ключ». Общим ключом Steam
+       отдаёт по чужому аккаунту урезанную библиотеку: часы есть, а даты
+       последнего запуска нет, и его игры не попадают в список последних.
+       Полную — только по аккаунту, на который ключ выдан. */
+    @Value("${steam.keys:}")
+    private String keys;
+
     @Value("${steam.cache-dir:./data}")
     private String cacheDir;
 
@@ -246,7 +253,7 @@ public class SteamAPIClientImpl implements SteamAPIClient {
 
     private List<GOGSteamResponseDto> request(String id) {
         SteamOwnedGamesResponse response =
-                template.getForObject(OWNED_URL.formatted(token, id), SteamOwnedGamesResponse.class);
+                template.getForObject(OWNED_URL.formatted(keyFor(id), id), SteamOwnedGamesResponse.class);
         List<GOGSteamResponseDto> games = response == null || response.getResponse() == null
                 ? null : response.getResponse().getGames();
         if (games == null || games.isEmpty()) {
@@ -266,6 +273,16 @@ public class SteamAPIClientImpl implements SteamAPIClient {
                 .map(String::trim)
                 .filter(id -> !id.isBlank() && !"0".equals(id))
                 .toList();
+    }
+
+    private String keyFor(String id) {
+        for (String pair : keys.split(",")) {
+            String[] parts = pair.trim().split(":", 2);
+            if (parts.length == 2 && parts[0].trim().equals(id) && !parts[1].isBlank()) {
+                return parts[1].trim();
+            }
+        }
+        return token;
     }
 
     /* Ответы переживают перезапуск: контейнер пересобирается часто, а каждый
