@@ -482,6 +482,8 @@ function displayMyGameLib() {
                нумерация начиналась со второй, и «01» стояло не у той игры,
                что показана крупно слева. */
             gamePlaying = data.some(game => game.playingNow);
+            sessionStartedAt = data.find(game => game.playingNow && game.sessionStartedAt)?.sessionStartedAt ?? null;
+            sessionSeenAt = Date.now();
             /* Выбранная кликом игра остаётся выбранной и после опроса:
                раньше каждые полминуты крупный блок сам перескакивал
                обратно на первую. Без выбора крупно — самая свежая, в каком
@@ -776,6 +778,51 @@ function displayGameLib(data, quiet = false) {
     });
 }
 
+/* Пока идёт игра, общие часы тикают: к числу из Steam прибавляется
+   та часть сессии, которой в нём ещё нет. Её начало присылает сервер
+   (см. uncountedSince). Steam обновляет часы с задержкой, и без этого
+   счётчик стоял бы на месте всю игру. */
+const SESSION_GRACE = 90 * 1000;        // дольше без подтверждения сессию не докручиваем
+const TOTAL_HOLD = 30 * 60 * 1000;      // сколько ждём, пока Steam догонит показанное
+let totalHoursBase = null;      // часы из /games-total-hours
+let sessionStartedAt = null;    // с какого момента сессия не засчитана, мс Unix, из /games
+let sessionSeenAt = 0;          // когда опрос последний раз ответил
+let totalShown = null;          // что сейчас на одометре, в минутах
+let totalHeldSince = null;      // с какого момента держим его против меньшего
+
+function renderTotalHours() {
+    const odo = document.getElementById('hours-odo');
+    if (!odo || totalHoursBase === null) return;
+    const now = Date.now();
+    /* Докручиваем только то, что подтвердил опрос: в скрытой вкладке он
+       стоит, и без этой границы счётчик тикал бы и после конца игры. */
+    const until = Math.min(now, sessionSeenAt + SESSION_GRACE);
+    const session = sessionStartedAt ? Math.max(0, Math.floor((until - sessionStartedAt) / 60000)) : 0;
+    let minutes = Math.round(totalHoursBase * 60) + session;
+
+    /* Назад не крутим. Игру закрыли — сессия пропадает сразу, а в часы
+       Steam её добавляет с опозданием (плюс четверть часа кеша на сервере),
+       и счётчик откатился бы на всю сессию, чтобы потом вернуться. Поэтому
+       показанное держим, пока его не догонят. Если меньшее число продержалось
+       полчаса, значит, оно и правда меньше, — тогда уступаем. */
+    if (totalShown !== null && minutes < totalShown) {
+        if (totalHeldSince === null) totalHeldSince = now;
+        if (now - totalHeldSince < TOTAL_HOLD) minutes = totalShown;
+        else totalHeldSince = null;
+    } else {
+        totalHeldSince = null;
+    }
+    totalShown = minutes;
+
+    /* Дробь часа — это минуты: «5623 h 10 m» читается сразу,
+       а «5623.17 h» приходилось пересчитывать в уме. */
+    const text = Math.floor(minutes / 60) + 'h' + String(minutes % 60).padStart(2, '0') + 'm';
+    setOdometer(odo, text, minutes);
+}
+
+// одометр сам не крутит одинаковое число, так что раз в секунду — дёшево
+setInterval(renderTotalHours, 1000);
+
 function displayTotalHours() {
     const odo = document.getElementById('hours-odo');
     if (!odo) return;
@@ -788,11 +835,8 @@ function displayTotalHours() {
         .then(data => {
             const hours = Number(data.trim());
             if (!Number.isFinite(hours)) throw new Error('not a number: ' + data);
-            /* Дробь часа — это минуты: «5623 h 10 m» читается сразу,
-               а «5623.17 h» приходилось пересчитывать в уме. */
-            const minutes = Math.round(hours * 60);
-            const text = Math.floor(minutes / 60) + 'h' + String(minutes % 60).padStart(2, '0') + 'm';
-            setOdometer(odo, text, minutes);
+            totalHoursBase = hours;
+            renderTotalHours();
         })
         .catch(err => {
             console.error(err);

@@ -27,4 +27,8 @@ public class PresenceDto {
     /** Приложение Discord, за которым он узнал игру: по нему берутся
      *  её иконка и обложка. Бывает пустым у игр, найденных только по процессу. */
     private String applicationId;
+
+    /** Когда началась сессия, миллисекундами Unix, — так Discord отдаёт
+     *  timestamps.start. Нет, если он его не знает. */
+    private Long startedAt;
 }

@@ -108,6 +108,8 @@ public class DiscordPresenceServiceImpl implements PresenceService {
                        и есть весь ответ. */
                     .details(emptyToNull(activity.path("details").asText(null)))
                     .applicationId(emptyToNull(activity.path("application_id").asText(null)))
+                    .startedAt(activity.path("timestamps").path("start").isNumber()
+                            ? activity.path("timestamps").path("start").asLong() : null)
                     .build();
         }
         return null;

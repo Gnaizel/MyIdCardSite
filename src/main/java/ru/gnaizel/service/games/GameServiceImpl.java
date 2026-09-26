@@ -178,7 +178,7 @@ public class GameServiceImpl implements GameService {
         }
 
         Playing current = new Playing(now.map(NowPlayingDto::getAppid).orElse(-1), discordGame,
-                now.map(NowPlayingDto::getJoinUrl).orElse(null));
+                now.map(NowPlayingDto::getJoinUrl).orElse(null), uncountedSince(now, library));
         List<GameDto> recent = new ArrayList<>(games.stream()
                 .map(game -> toDto(game, current))
                 .toList());
@@ -219,7 +219,7 @@ public class GameServiceImpl implements GameService {
                 .map(GameMapper::sameName)
                 .orElse("");
         Playing playing = new Playing(now.map(NowPlayingDto::getAppid).orElse(-1), discordGame,
-                now.map(NowPlayingDto::getJoinUrl).orElse(null));
+                now.map(NowPlayingDto::getJoinUrl).orElse(null), uncountedSince(now, library));
         return games.stream().map(game -> toDto(game, playing)).toList();
     }
 
@@ -237,7 +237,54 @@ public class GameServiceImpl implements GameService {
             dto.setPlaytime_forever("—");
             dto.setPlaytime_2weeks("—");
         }
+        /* Начало сессии отдаём только игре, чьи часы уже есть в общем
+           счётчике: иначе страница докрутила бы часы, которых в сумме нет,
+           а после выхода из игры они бы откатились. */
+        if (playing && game.getPlaytime_forever() > 0) {
+            dto.setSessionStartedAt(now.startedAt());
+        }
         return dto;
+    }
+
+    /**
+     * С какого момента идёт та часть сессии, которой ещё нет в часах,
+     * миллисекундами Unix, или null.
+     * <p>
+     * Когда сессия началась, знает только Discord: Steam отдаёт лишь то,
+     * что игра запущена. Но источник часов может засчитать часть сессии,
+     * не дожидаясь её конца, — Fortnite обновляет статистику после каждого
+     * матча. Всё, что было до его последней отметки, уже в часах, и если
+     * считать от начала сессии, эти минуты попадут в счётчик дважды.
+     * Поэтому берём более позднюю из двух отметок.
+     */
+    private Long uncountedSince(Optional<NowPlayingDto> now, Library library) {
+        Optional<PresenceDto> presence = presenceService.nowPlaying()
+                .filter(p -> !ignored(p.getGame()))
+                /* Если Steam назвал игру, Discord должен говорить о ней же —
+                   иначе это время чужой программы. */
+                .filter(p -> now.isEmpty()
+                        || GameMapper.sameName(p.getGame()).equals(GameMapper.sameName(now.get().getName())));
+        Long started = presence.map(PresenceDto::getStartedAt).orElse(null);
+        if (started == null) {
+            return null;
+        }
+
+        long counted;
+        if (now.isPresent()) {
+            int appid = now.get().getAppid();
+            counted = library.steam().stream()
+                    .filter(game -> game.getAppid() == appid)
+                    .mapToLong(game -> game.getRtime_last_played() * 1000)
+                    .max()
+                    .orElse(0);
+        } else {
+            boolean fortnite = GameMapper.sameName(presence.get().getGame()).equals(GameMapper.sameName(fortniteTitle));
+            counted = library.fortnite()
+                    .filter(stats -> fortnite && stats.getLastModified() != null)
+                    .map(stats -> stats.getLastModified().toEpochMilli())
+                    .orElse(0L);
+        }
+        return Math.max(started, counted);
     }
 
     private static int indexOf(List<Game> games, int appid) {
@@ -349,7 +396,8 @@ public class GameServiceImpl implements GameService {
                            boolean complete) {
     }
 
-    /* Что запущено прямо сейчас: appid из Steam или имя из Discord. */
-    private record Playing(int appid, String discordGame, String joinUrl) {
+    /* Что запущено прямо сейчас: appid из Steam или имя из Discord,
+       и с какого момента сессия ещё не засчитана в часы, если это известно. */
+    private record Playing(int appid, String discordGame, String joinUrl, Long startedAt) {
     }
 }
